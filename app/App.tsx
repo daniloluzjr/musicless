@@ -29,6 +29,8 @@ import {
   UploadCloud,
   Link2,
   Star,
+  CheckCircle2,
+  Trash2,
 } from 'lucide-react-native';
 import { StemTrack, StemType } from './src/types';
 import { audioEngine } from './src/audio/StemAudioEngine';
@@ -90,9 +92,97 @@ export default function App() {
     other: 0,
   });
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [importTab, setImportTab] = useState<'file' | 'url'>('url');
+  const [importTab, setImportTab] = useState<'file' | 'url'>('file');
   const [urlInput, setUrlInput] = useState('');
   const [isProcessingUrl, setIsProcessingUrl] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<{
+    name: string;
+    size: string;
+    rawFile?: File;
+  } | null>(null);
+  const [songTitle, setSongTitle] = useState('Funk Groove Demo (120 BPM)');
+  const [songSubtitle, setSongSubtitle] = useState('Multi-Track Stem Session (4 Channels)');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+
+  const handleChooseFile = () => {
+    if (Platform.OS === 'web') {
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'audio/*,.mp3,.wav,.flac,.m4a';
+      fileInput.style.display = 'none';
+
+      fileInput.onchange = async (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        const file = target.files?.[0];
+        if (file) {
+          const sizeMB = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+          setSelectedFile({
+            name: file.name,
+            size: sizeMB,
+            rawFile: file,
+          });
+          setSongTitle(file.name);
+          setSongSubtitle(`Custom Track Loaded • ${sizeMB}`);
+
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const trackDuration = await audioEngine.loadFullTrack(arrayBuffer);
+            setDuration(trackDuration);
+            setCurrentTime(0);
+            setIsPlaying(false);
+          } catch (err) {
+            console.error('Error decoding audio track', err);
+          }
+        }
+        fileInput.remove();
+      };
+
+      document.body.appendChild(fileInput);
+      fileInput.click();
+    } else {
+      Alert.alert('File Picker', 'Native audio file selection.');
+    }
+  };
+
+  const handleClearFile = () => {
+    setSelectedFile(null);
+    setSongTitle('Funk Groove Demo (120 BPM)');
+    setSongSubtitle('Multi-Track Stem Session (4 Channels)');
+    audioEngine.stop();
+    setDuration(16.0);
+    setCurrentTime(0);
+    setIsPlaying(false);
+  };
+
+  const handleSeparateUploadedFile = async () => {
+    if (!selectedFile) return;
+    setIsProcessingFile(true);
+
+    try {
+      const formData = new FormData();
+      if (selectedFile.rawFile) {
+        formData.append('file', selectedFile.rawFile);
+      }
+
+      const response = await fetch('http://localhost:8000/separate', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        Alert.alert('Success', 'AI Stem Separation finished! 4 stems separated.');
+      } else {
+        throw new Error('Backend offline');
+      }
+    } catch {
+      Alert.alert(
+        'Track Loaded into Player',
+        `"${selectedFile.name}" is already loaded and ready to play in the mixer!\n\nTo run full AI 4-stem separation (Demucs v4), start the backend server:\ncd backend && python server.py`
+      );
+    } finally {
+      setIsProcessingFile(false);
+    }
+  };
 
   const handleProcessUrl = () => {
     if (!urlInput.trim()) {
@@ -339,8 +429,8 @@ export default function App() {
         <View style={styles.playerCard}>
           <View style={styles.trackInfoRow}>
             <View>
-              <Text style={styles.songTitle}>Funk Groove Demo (120 BPM)</Text>
-              <Text style={styles.artistName}>Multi-Track Stem Session (4 Channels)</Text>
+              <Text style={styles.songTitle} numberOfLines={1}>{songTitle}</Text>
+              <Text style={styles.artistName} numberOfLines={1}>{songSubtitle}</Text>
             </View>
             <View style={styles.timeBadge}>
               <Text style={styles.timeText}>
@@ -624,22 +714,62 @@ export default function App() {
             </View>
           ) : (
             <View style={styles.tabContentContainer}>
-              <UploadCloud size={32} color="#38bdf8" style={{ marginBottom: 8 }} />
-              <Text style={styles.uploadCardTitle}>Upload Audio File</Text>
-              <Text style={styles.uploadCardDesc}>
-                Supports MP3, WAV, FLAC, M4A up to 50MB. Processed with Demucs AI.
-              </Text>
-              <TouchableOpacity
-                style={styles.uploadActionBtn}
-                onPress={() => {
-                  Alert.alert(
-                    'File Upload',
-                    'Choose any MP3, WAV or FLAC track to send to the Demucs AI separation pipeline!'
-                  );
-                }}
-              >
-                <Text style={styles.uploadActionBtnText}>Choose Audio File</Text>
-              </TouchableOpacity>
+              {selectedFile ? (
+                <View style={styles.selectedFileCard}>
+                  <View style={styles.selectedFileInfoRow}>
+                    <View style={styles.selectedFileIconBox}>
+                      <Music size={20} color="#38bdf8" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.selectedFileName} numberOfLines={1}>
+                        {selectedFile.name}
+                      </Text>
+                      <Text style={styles.selectedFileSize}>
+                        {selectedFile.size} • Loaded in Player
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={handleClearFile} style={styles.clearFileBtn}>
+                      <Trash2 size={16} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.selectedFileActionsRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.uploadActionBtn,
+                        isProcessingFile && styles.uploadActionBtnLoading,
+                      ]}
+                      onPress={handleSeparateUploadedFile}
+                      disabled={isProcessingFile}
+                    >
+                      <Text style={styles.uploadActionBtnText}>
+                        {isProcessingFile ? 'Separating Stems with Demucs...' : 'Separate Stems with Demucs AI'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.changeFileBtn}
+                      onPress={handleChooseFile}
+                    >
+                      <Text style={styles.changeFileBtnText}>Change File</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <UploadCloud size={32} color="#38bdf8" style={{ marginBottom: 8 }} />
+                  <Text style={styles.uploadCardTitle}>Upload Audio File</Text>
+                  <Text style={styles.uploadCardDesc}>
+                    Supports MP3, WAV, FLAC, M4A up to 50MB. Processed with Demucs AI.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.uploadActionBtn}
+                    onPress={handleChooseFile}
+                  >
+                    <Text style={styles.uploadActionBtnText}>Choose Audio File</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           )}
         </View>
@@ -1151,5 +1281,61 @@ const styles = StyleSheet.create({
     color: '#38bdf8',
     fontSize: 13,
     fontWeight: '700',
+  },
+  selectedFileCard: {
+    width: '100%',
+    maxWidth: 600,
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#38bdf844',
+  },
+  selectedFileInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  selectedFileIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: '#38bdf822',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedFileName: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  selectedFileSize: {
+    color: '#38bdf8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  clearFileBtn: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#ef444422',
+  },
+  selectedFileActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  changeFileBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  changeFileBtnText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

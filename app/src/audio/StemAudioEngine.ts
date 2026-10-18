@@ -314,6 +314,21 @@ class StemAudioEngine {
     }
   }
 
+  public async loadFullTrack(fileData: ArrayBuffer): Promise<number> {
+    this.initContext();
+    if (!this.ctx) return 0;
+    this.stop();
+    const decodedBuffer = await this.ctx.decodeAudioData(fileData);
+    this.duration = decodedBuffer.duration;
+    // Load as default full track into other stem and clear pause offset
+    this.stemBuffers.set('other', decodedBuffer);
+    this.pauseOffset = 0;
+    if (this.onTimeUpdateCallback) {
+      this.onTimeUpdateCallback(0);
+    }
+    return this.duration;
+  }
+
   public setOnTimeUpdate(cb: (time: number) => void): void {
     this.onTimeUpdateCallback = cb;
   }
