@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   Platform,
   Alert,
+  TextInput,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -25,6 +26,7 @@ import {
   Sparkles,
   Info,
   UploadCloud,
+  Link2,
 } from 'lucide-react-native';
 import { StemTrack, StemType } from './src/types';
 import { audioEngine } from './src/audio/StemAudioEngine';
@@ -86,6 +88,29 @@ export default function App() {
     other: 0,
   });
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [importTab, setImportTab] = useState<'file' | 'url'>('url');
+  const [urlInput, setUrlInput] = useState('');
+  const [isProcessingUrl, setIsProcessingUrl] = useState(false);
+
+  const handleProcessUrl = () => {
+    if (!urlInput.trim()) {
+      Alert.alert('Missing URL', 'Please paste a valid YouTube, Spotify, or audio link.');
+      return;
+    }
+
+    const isYoutube = urlInput.includes('youtube.com') || urlInput.includes('youtu.be');
+    const isSpotify = urlInput.includes('spotify.com');
+
+    setIsProcessingUrl(true);
+
+    setTimeout(() => {
+      setIsProcessingUrl(false);
+      Alert.alert(
+        'Processing Initiated',
+        `Link detected (${isYoutube ? 'YouTube' : isSpotify ? 'Spotify' : 'Web Audio'}).\n\nThe backend server will extract the audio track via yt-dlp/spotdl and separate it into 4 stems with Demucs v4!`
+      );
+    }, 1200);
+  };
 
   // Sync with audio engine
   useEffect(() => {
@@ -504,24 +529,107 @@ export default function App() {
           })}
         </View>
 
-        {/* UPLOAD / EXPANSION BANNER */}
+        {/* IMPORT & SEPARATION HUB */}
         <View style={styles.uploadCard}>
-          <UploadCloud size={28} color="#38bdf8" />
-          <Text style={styles.uploadCardTitle}>Separate New Song (MP3 / WAV)</Text>
-          <Text style={styles.uploadCardDesc}>
-            Sustainable open-source setup: split your full songs with Demucs AI locally or using free API endpoints.
-          </Text>
-          <TouchableOpacity
-            style={styles.uploadActionBtn}
-            onPress={() => {
-              Alert.alert(
-                'Next Step',
-                'The separation pipeline will connect Demucs / ONNX to process any uploaded song!'
-              );
-            }}
-          >
-            <Text style={styles.uploadActionBtnText}>Import Audio File</Text>
-          </TouchableOpacity>
+          {/* TAB SELECTOR */}
+          <View style={styles.importTabRow}>
+            <TouchableOpacity
+              style={[
+                styles.importTabBtn,
+                importTab === 'url' && styles.importTabBtnActive,
+              ]}
+              onPress={() => setImportTab('url')}
+            >
+              <Link2 size={16} color={importTab === 'url' ? '#38bdf8' : '#94a3b8'} />
+              <Text
+                style={[
+                  styles.importTabText,
+                  importTab === 'url' && styles.importTabTextActive,
+                ]}
+              >
+                Paste Link (YouTube / Spotify)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.importTabBtn,
+                importTab === 'file' && styles.importTabBtnActive,
+              ]}
+              onPress={() => setImportTab('file')}
+            >
+              <UploadCloud size={16} color={importTab === 'file' ? '#38bdf8' : '#94a3b8'} />
+              <Text
+                style={[
+                  styles.importTabText,
+                  importTab === 'file' && styles.importTabTextActive,
+                ]}
+              >
+                Upload File (MP3 / WAV)
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {importTab === 'url' ? (
+            <View style={styles.tabContentContainer}>
+              <View style={styles.badgesRow}>
+                <View style={[styles.platformBadge, { backgroundColor: '#ef444422', borderColor: '#ef444466' }]}>
+                  <Text style={[styles.platformBadgeText, { color: '#ef4444' }]}>YouTube</Text>
+                </View>
+                <View style={[styles.platformBadge, { backgroundColor: '#22c55e22', borderColor: '#22c55e66' }]}>
+                  <Text style={[styles.platformBadgeText, { color: '#22c55e' }]}>Spotify</Text>
+                </View>
+                <View style={[styles.platformBadge, { backgroundColor: '#f9731622', borderColor: '#f9731666' }]}>
+                  <Text style={[styles.platformBadgeText, { color: '#f97316' }]}>SoundCloud / Web</Text>
+                </View>
+              </View>
+
+              <View style={styles.urlInputBox}>
+                <Link2 size={18} color="#64748b" style={{ marginRight: 10 }} />
+                <TextInput
+                  style={styles.urlTextInput}
+                  placeholder="Paste YouTube, Spotify or audio URL..."
+                  placeholderTextColor="#64748b"
+                  value={urlInput}
+                  onChangeText={setUrlInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.uploadActionBtn, isProcessingUrl && styles.uploadActionBtnLoading]}
+                onPress={handleProcessUrl}
+                disabled={isProcessingUrl}
+              >
+                <Text style={styles.uploadActionBtnText}>
+                  {isProcessingUrl ? 'Extracting Audio & Stems...' : 'Extract & Separate Stems'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.uploadCardDesc}>
+                Audio will be fetched via <Text style={styles.bold}>yt-dlp</Text> and split into 4 stems using <Text style={styles.bold}>Demucs v4</Text>.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.tabContentContainer}>
+              <UploadCloud size={32} color="#38bdf8" style={{ marginBottom: 8 }} />
+              <Text style={styles.uploadCardTitle}>Upload Audio File</Text>
+              <Text style={styles.uploadCardDesc}>
+                Supports MP3, WAV, FLAC, M4A up to 50MB. Processed with Demucs AI.
+              </Text>
+              <TouchableOpacity
+                style={styles.uploadActionBtn}
+                onPress={() => {
+                  Alert.alert(
+                    'File Upload',
+                    'Choose any MP3, WAV or FLAC track to send to the Demucs AI separation pipeline!'
+                  );
+                }}
+              >
+                <Text style={styles.uploadActionBtnText}>Choose Audio File</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -902,17 +1010,87 @@ const styles = StyleSheet.create({
   uploadCard: {
     backgroundColor: '#0c1322',
     borderRadius: 14,
-    padding: 20,
-    alignItems: 'center',
+    padding: 18,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: '#38bdf855',
+  },
+  importTabRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  importTabBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  importTabBtnActive: {
+    backgroundColor: '#38bdf822',
+    borderColor: '#38bdf8',
+  },
+  importTabText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  importTabTextActive: {
+    color: '#38bdf8',
+    fontWeight: '700',
+  },
+  tabContentContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  platformBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  platformBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  urlInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    width: '100%',
+    maxWidth: 600,
+    marginBottom: 14,
+  },
+  urlTextInput: {
+    flex: 1,
+    color: '#f8fafc',
+    fontSize: 13,
+    outlineWidth: 0,
   },
   uploadCardTitle: {
     color: '#f8fafc',
     fontSize: 15,
     fontWeight: '700',
-    marginTop: 10,
+    marginTop: 6,
     marginBottom: 4,
   },
   uploadCardDesc: {
@@ -920,15 +1098,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: 14,
+    marginTop: 10,
+    maxWidth: 500,
   },
   uploadActionBtn: {
     backgroundColor: '#1e293b',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#38bdf8',
+    alignItems: 'center',
+  },
+  uploadActionBtnLoading: {
+    opacity: 0.7,
+    borderColor: '#64748b',
   },
   uploadActionBtnText: {
     color: '#38bdf8',

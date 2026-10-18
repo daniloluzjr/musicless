@@ -79,6 +79,62 @@ async def separate_audio(file: UploadFile = File(...)):
         }
     }
 
+from pydantic import BaseModel
+
+class UrlRequest(BaseModel):
+    url: str
+
+@app.post("/separate-url")
+async def separate_url(req: UrlRequest):
+    """
+    Downloads audio from YouTube, SoundCloud, or resolves Spotify tracks via yt-dlp,
+    then separates it into 4 stems using Demucs v4.
+    """
+    import hashlib
+    url = req.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL cannot be empty")
+
+    url_hash = hashlib.md5(url.encode()).hexdigest()[:10]
+    output_filename = f"track_{url_hash}"
+    output_wav = UPLOAD_DIR / f"{output_filename}.wav"
+
+    # Step 1: Download audio using yt-dlp
+    # Note: For Spotify links, yt-dlp / spotdl searches YouTube by metadata
+    ytdlp_cmd = [
+        "yt-dlp",
+        "-x",
+        "--audio-format", "wav",
+        "--audio-quality", "0",
+        "--max-filesize", "50M",
+        "-o", str(UPLOAD_DIR / f"{output_filename}.%(ext)s"),
+        url
+    ]
+
+    try:
+        subprocess.run(ytdlp_cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch audio from link: {e.stderr}")
+
+    # Step 2: Separate with Demucs v4
+    full_cmd = ["demucs", "-n", "htdemucs", str(output_wav), "-o", str(OUTPUT_DIR)]
+    try:
+        subprocess.run(full_cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Demucs separation failed: {e.stderr}")
+
+    return {
+        "status": "completed",
+        "source_url": url,
+        "track_id": output_filename,
+        "stems": {
+            "vocals": f"/separated/htdemucs/{output_filename}/vocals.wav",
+            "drums": f"/separated/htdemucs/{output_filename}/drums.wav",
+            "bass": f"/separated/htdemucs/{output_filename}/bass.wav",
+            "other": f"/separated/htdemucs/{output_filename}/other.wav",
+        }
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
