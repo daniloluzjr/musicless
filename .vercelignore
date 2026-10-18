@@ -1,9 +1,13 @@
 backend/
+backend/**
+*.py
+requirements.txt
+Dockerfile
+uploads/
+separated/
 *.wav
 *.mp3
 *.webm
 *.part
-uploads/
-separated/
 features_2.csv
 recon_3.md

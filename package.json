@@ -1,0 +1,9 @@
+{
+  "name": "musicless-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix app run build",
+    "web": "npm --prefix app run web"
+  }
+}
