@@ -70,10 +70,10 @@ class StemAudioEngine {
         filter.type = 'highpass';
         filter.frequency.value = 3600;
       } else {
-        // Guitars & Other: Stereo / high-mid presence
-        filter.type = 'peaking';
-        filter.frequency.value = 2400;
-        filter.gain.value = 2.0;
+        // Guitars & Other: Bandpass 1200Hz - 3400Hz
+        filter.type = 'bandpass';
+        filter.frequency.value = 2200;
+        filter.Q.value = 0.9;
       }
 
       filter.connect(gain);
@@ -227,6 +227,34 @@ class StemAudioEngine {
     if (this.isPlaying) {
       this.play();
     }
+  }
+
+  public async loadAllStems(stems: Partial<Record<StemType, ArrayBuffer>>): Promise<number> {
+    this.initContext();
+    if (!this.ctx) return 0;
+    this.stop();
+    this.hasDedicatedStems = true;
+    this.fullTrackBuffer = null;
+    let maxDuration = 0;
+    for (const [stem, buf] of Object.entries(stems)) {
+      if (buf) {
+        try {
+          const decoded = await this.ctx.decodeAudioData(buf);
+          this.stemBuffers.set(stem as StemType, decoded);
+          if (decoded.duration > maxDuration) {
+            maxDuration = decoded.duration;
+          }
+        } catch (e) {
+          console.error(`Error decoding stem ${stem}:`, e);
+        }
+      }
+    }
+    this.duration = maxDuration;
+    this.pauseOffset = 0;
+    if (this.onTimeUpdateCallback) {
+      this.onTimeUpdateCallback(0);
+    }
+    return this.duration;
   }
 
   public async loadFullTrack(fileData: ArrayBuffer): Promise<number> {

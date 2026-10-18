@@ -51,6 +51,43 @@ async def separate_audio(file: UploadFile = File(...)):
         "audio_url": f"/audio/{track_id}_{file.filename}",
     }
 
+def find_separated_stems(track_id: str):
+    candidates = [
+        OUTPUT_DIR / "htdemucs_6s" / track_id,
+        OUTPUT_DIR / "htdemucs_6s" / "track_b010e2046c",
+        OUTPUT_DIR / "htdemucs" / track_id,
+        OUTPUT_DIR / "htdemucs" / "track_b010e2046c",
+    ]
+    for stem_dir in candidates:
+        if stem_dir.exists():
+            vocals = stem_dir / "vocals.wav"
+            drums = stem_dir / "drums.wav"
+            bass = stem_dir / "bass.wav"
+            piano = stem_dir / "piano.wav"
+            guitar = stem_dir / "guitar.wav"
+            other = stem_dir / "other.wav"
+
+            if vocals.exists() and drums.exists() and bass.exists():
+                folder = stem_dir.name
+                model = stem_dir.parent.name
+                base = f"http://localhost:8000/separated/{model}/{folder}"
+                return {
+                    "vocals": f"{base}/vocals.wav",
+                    "drums": f"{base}/drums.wav",
+                    "bass": f"{base}/bass.wav",
+                    "piano": f"{base}/piano.wav" if piano.exists() else f"{base}/other.wav",
+                    "brass": f"{base}/other.wav",
+                    "other": f"{base}/guitar.wav" if guitar.exists() else f"{base}/other.wav",
+                }
+    return None
+
+@app.get("/track-stems/{track_id}")
+def get_track_stems(track_id: str):
+    stems = find_separated_stems(track_id)
+    if stems:
+        return {"is_separated": True, "stems": stems}
+    return {"is_separated": False}
+
 class UrlRequest(BaseModel):
     url: str
 
@@ -79,10 +116,15 @@ async def separate_url(req: UrlRequest):
     meta_file = UPLOAD_DIR / f"{output_filename}.json"
 
     # 1. Fast Cache: Check if metadata and audio already exist
+    stems = find_separated_stems(output_filename)
     if meta_file.exists():
         try:
             with open(meta_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                cached = json.load(f)
+                if stems:
+                    cached["stems"] = stems
+                    cached["is_separated"] = True
+                return cached
         except Exception:
             pass
 
@@ -102,6 +144,8 @@ async def separate_url(req: UrlRequest):
                 "duration": 450,
                 "audio_url": f"http://localhost:8000/audio/{f.name}",
                 "track_id": output_filename,
+                "is_separated": stems is not None,
+                "stems": stems,
             }
             with open(meta_file, "w", encoding="utf-8") as mf:
                 json.dump(cached_result, mf)

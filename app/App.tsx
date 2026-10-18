@@ -249,18 +249,39 @@ export default function App() {
       setSongTitle(data.title);
       setSongSubtitle(`${data.artist} • YouTube Stream`);
 
-      // Fetch and decode the audio buffer directly into the Web Audio API engine
-      const audioResponse = await fetch(data.audio_url);
-      const audioBuffer = await audioResponse.arrayBuffer();
-      const trackDuration = await audioEngine.loadFullTrack(audioBuffer);
+      if (data.stems) {
+        setUrlStatusMessage(`Loading 6 isolated studio stems (Vocals, Drums, Bass, Piano, Brass, Guitar)...`);
+        const stemBuffers: Partial<Record<StemType, ArrayBuffer>> = {};
+        await Promise.all(
+          (['vocals', 'drums', 'bass', 'piano', 'brass', 'other'] as StemType[]).map(async (stemKey) => {
+            const stemUrl = data.stems[stemKey];
+            if (stemUrl) {
+              const res = await fetch(stemUrl);
+              stemBuffers[stemKey] = await res.arrayBuffer();
+            }
+          })
+        );
+        const trackDuration = await audioEngine.loadAllStems(stemBuffers);
+        setDuration(trackDuration || data.duration);
+        setCurrentTime(0);
+        setIsPlaying(false);
+        setIsSongLoaded(true);
+        setUrlStatus('success');
+        setUrlStatusMessage(`Ready! Loaded 6 isolated studio stems for "${data.title}". Zero bleed!`);
+      } else {
+        // Fetch and decode full track into 6-stem crossover filter engine
+        const audioResponse = await fetch(data.audio_url);
+        const audioBuffer = await audioResponse.arrayBuffer();
+        const trackDuration = await audioEngine.loadFullTrack(audioBuffer);
 
-      setDuration(trackDuration || data.duration);
-      setCurrentTime(0);
-      setIsPlaying(false);
-      setIsSongLoaded(true);
+        setDuration(trackDuration || data.duration);
+        setCurrentTime(0);
+        setIsPlaying(false);
+        setIsSongLoaded(true);
 
-      setUrlStatus('success');
-      setUrlStatusMessage(`Ready! Loaded "${data.title}". Press Play above to listen and practice!`);
+        setUrlStatus('success');
+        setUrlStatusMessage(`Ready! Loaded "${data.title}". Press Play to listen and practice!`);
+      }
     } catch (err: any) {
       console.error('URL extraction error:', err);
       setUrlStatus('error');
