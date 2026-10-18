@@ -82,7 +82,7 @@ export default function App() {
   const [tracks, setTracks] = useState<StemTrack[]>(INITIAL_TRACKS);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(16.0);
+  const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [activePreset, setActivePreset] = useState<string>('all');
   const [levels, setLevels] = useState<Record<StemType, number>>({
@@ -102,8 +102,9 @@ export default function App() {
     size: string;
     rawFile?: File;
   } | null>(null);
-  const [songTitle, setSongTitle] = useState('Funk Groove Demo (120 BPM)');
-  const [songSubtitle, setSongSubtitle] = useState('Multi-Track Stem Session (4 Channels)');
+  const [isSongLoaded, setIsSongLoaded] = useState(false);
+  const [songTitle, setSongTitle] = useState('');
+  const [songSubtitle, setSongSubtitle] = useState('');
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   const handleChooseFile = () => {
@@ -124,7 +125,8 @@ export default function App() {
             rawFile: file,
           });
           setSongTitle(file.name);
-          setSongSubtitle(`Custom Track Loaded • ${sizeMB}`);
+          setSongSubtitle(`Custom Audio Track • ${sizeMB}`);
+          setIsSongLoaded(true);
 
           try {
             const arrayBuffer = await file.arrayBuffer();
@@ -146,14 +148,17 @@ export default function App() {
     }
   };
 
-  const handleClearFile = () => {
-    setSelectedFile(null);
-    setSongTitle('Funk Groove Demo (120 BPM)');
-    setSongSubtitle('Multi-Track Stem Session (4 Channels)');
+  const handleChangeSong = () => {
     audioEngine.stop();
-    setDuration(16.0);
-    setCurrentTime(0);
     setIsPlaying(false);
+    setIsSongLoaded(false);
+    setSelectedFile(null);
+    setSongTitle('');
+    setSongSubtitle('');
+    setDuration(0);
+    setCurrentTime(0);
+    setUrlStatus('idle');
+    setUrlStatusMessage('');
   };
 
   const handleSeparateUploadedFile = async () => {
@@ -227,6 +232,7 @@ export default function App() {
       setDuration(trackDuration || data.duration);
       setCurrentTime(0);
       setIsPlaying(false);
+      setIsSongLoaded(true);
 
       setUrlStatus('success');
       setUrlStatusMessage(`Ready! Loaded "${data.title}". Press Play above to listen and practice!`);
@@ -404,440 +410,404 @@ export default function App() {
           </View>
         )}
 
-        {/* PRESET PRACTICE MODES */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Quick Practice Modes</Text>
-          <Text style={styles.sectionHint}>Mute your instrument with a single click</Text>
-        </View>
-
-        <View style={styles.presetRow}>
-          <TouchableOpacity
-            style={[styles.presetButton, activePreset === 'karaoke' && styles.presetButtonActive]}
-            onPress={() => applyPreset('karaoke')}
-          >
-            <Mic size={16} color={activePreset === 'karaoke' ? '#fff' : '#38bdf8'} />
-            <Text style={[styles.presetText, activePreset === 'karaoke' && styles.presetTextActive]}>
-              Karaoke
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.presetButton, activePreset === 'drums' && styles.presetButtonActive]}
-            onPress={() => applyPreset('drums')}
-          >
-            <Disc size={16} color={activePreset === 'drums' ? '#fff' : '#fb923c'} />
-            <Text style={[styles.presetText, activePreset === 'drums' && styles.presetTextActive]}>
-              Drums
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.presetButton, activePreset === 'bass' && styles.presetButtonActive]}
-            onPress={() => applyPreset('bass')}
-          >
-            <Activity size={16} color={activePreset === 'bass' ? '#fff' : '#c084fc'} />
-            <Text style={[styles.presetText, activePreset === 'bass' && styles.presetTextActive]}>
-              Bass
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.presetButton, activePreset === 'guitar' && styles.presetButtonActive]}
-            onPress={() => applyPreset('guitar')}
-          >
-            <Music size={16} color={activePreset === 'guitar' ? '#fff' : '#34d399'} />
-            <Text style={[styles.presetText, activePreset === 'guitar' && styles.presetTextActive]}>
-              Guitar
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.presetButton, activePreset === 'all' && styles.presetButtonActive]}
-            onPress={() => applyPreset('all')}
-          >
-            <Volume2 size={16} color={activePreset === 'all' ? '#fff' : '#94a3b8'} />
-            <Text style={[styles.presetText, activePreset === 'all' && styles.presetTextActive]}>
-              All
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* TRANSPORT & TRACK CONTROLS */}
-        <View style={styles.playerCard}>
-          <View style={styles.trackInfoRow}>
-            <View>
-              <Text style={styles.songTitle} numberOfLines={1}>{songTitle}</Text>
-              <Text style={styles.artistName} numberOfLines={1}>{songSubtitle}</Text>
-            </View>
-            <View style={styles.timeBadge}>
-              <Text style={styles.timeText}>
-                {formatTime(currentTime)} / {formatTime(duration)}
+        {!isSongLoaded ? (
+          /* TOP INPUT HUB (IN PLACE OF TEST MUSIC DIV) */
+          <View style={styles.uploadCard}>
+            <View style={styles.sectionHeaderCenter}>
+              <Text style={styles.heroTitle}>Load Song to Practice</Text>
+              <Text style={styles.heroSubtitle}>
+                Paste a link from YouTube Music / Spotify or choose an audio file to mute instruments and play along!
               </Text>
             </View>
-          </View>
 
-          {/* TIMELINE PROGRESS BAR */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={styles.progressBarBg}
-            onPress={(e) => {
-              if (Platform.OS === 'web') {
-                const target = e.currentTarget as unknown as HTMLElement;
-                const rect = target.getBoundingClientRect();
-                const nativeEvent = e.nativeEvent as unknown as MouseEvent;
-                const clickX = nativeEvent.clientX - rect.left;
-                const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-                handleSeek(ratio);
-              } else {
-                handleSeek(0.5);
-              }
-            }}
-          >
-            <View
-              style={[
-                styles.progressBarFill,
-                { width: `${Math.min(100, (currentTime / (duration || 1)) * 100)}%` },
-              ]}
-            />
-          </TouchableOpacity>
-
-          {/* CONTROLS ROW */}
-          <View style={styles.transportRow}>
-            {/* Speed Selector */}
-            <View style={styles.speedGroup}>
-              {[0.75, 1.0, 1.25].map((speed) => (
-                <TouchableOpacity
-                  key={speed}
-                  style={[
-                    styles.speedBtn,
-                    playbackSpeed === speed && styles.speedBtnActive,
-                  ]}
-                  onPress={() => changeSpeed(speed)}
-                >
-                  <Text
-                    style={[
-                      styles.speedText,
-                      playbackSpeed === speed && styles.speedTextActive,
-                    ]}
-                  >
-                    {speed}x
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Play/Pause & Rewind */}
-            <View style={styles.mainControls}>
-              <TouchableOpacity style={styles.secondaryCtrlBtn} onPress={handleRewind}>
-                <RotateCcw size={20} color="#cbd5e1" />
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
-                {isPlaying ? (
-                  <Pause size={28} color="#0f172a" />
-                ) : (
-                  <Play size={28} color="#0f172a" style={{ marginLeft: 3 }} />
-                )}
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.statusGroup}>
-              <View style={[styles.statusDot, isPlaying && styles.statusDotActive]} />
-              <Text style={styles.statusText}>{isPlaying ? 'PLAYING' : 'PAUSED'}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* 4-STEMS MIXER SECTION */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Multi-Track Stem Mixer</Text>
-          <Text style={styles.sectionHint}>Adjust volume faders, mute or solo any instrument</Text>
-        </View>
-
-        <View style={styles.channelsList}>
-          {tracks.map((track) => {
-            const hasAnySolo = tracks.some((t) => t.isSolo);
-            const isSilenced = track.isMuted || (hasAnySolo && !track.isSolo);
-            const level = levels[track.id] || 0;
-
-            return (
-              <View key={track.id} style={[styles.channelCard, isSilenced && styles.channelSilenced]}>
-                {/* Header of Channel */}
-                <View style={styles.channelHeader}>
-                  <View style={styles.channelLabelGroup}>
-                    <View style={[styles.channelIconBox, { backgroundColor: `${track.color}22` }]}>
-                      {renderIcon(track.id, track.color)}
-                    </View>
-                    <View>
-                      <Text style={styles.channelName}>{track.name}</Text>
-                      <Text style={styles.channelSubtitle}>{track.subtitle}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.channelActions}>
-                    {/* MUTE BUTTON */}
-                    <TouchableOpacity
-                      style={[
-                        styles.toggleBtn,
-                        track.isMuted ? styles.muteBtnActive : styles.toggleBtnInactive,
-                      ]}
-                      onPress={() => handleToggleMute(track.id)}
-                    >
-                      {track.isMuted ? (
-                        <VolumeX size={15} color="#ef4444" />
-                      ) : (
-                        <Volume2 size={15} color="#94a3b8" />
-                      )}
-                      <Text
-                        style={[
-                          styles.toggleBtnText,
-                          track.isMuted && styles.muteTextActive,
-                        ]}
-                      >
-                        MUTE
-                      </Text>
-                    </TouchableOpacity>
-
-                    {/* SOLO BUTTON */}
-                    <TouchableOpacity
-                      style={[
-                        styles.toggleBtn,
-                        track.isSolo ? styles.soloBtnActive : styles.toggleBtnInactive,
-                      ]}
-                      onPress={() => handleToggleSolo(track.id)}
-                    >
-                      <Headphones
-                        size={15}
-                        color={track.isSolo ? '#eab308' : '#94a3b8'}
-                      />
-                      <Text
-                        style={[
-                          styles.toggleBtnText,
-                          track.isSolo && styles.soloTextActive,
-                        ]}
-                      >
-                        SOLO
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* VU METER LEVEL BAR */}
-                <View style={styles.meterContainer}>
-                  <View
-                    style={[
-                      styles.meterBar,
-                      {
-                        width: `${Math.min(100, (isSilenced ? 0 : level) * 100 * (track.volume || 1))}%`,
-                        backgroundColor: track.color,
-                      },
-                    ]}
-                  />
-                </View>
-
-                {/* VOLUME CONTROLLER */}
-                <View style={styles.faderRow}>
-                  <Text style={styles.faderLabel}>Volume</Text>
-                  <View style={styles.volStepContainer}>
-                    {[0, 0.25, 0.5, 0.75, 1.0].map((step) => {
-                      const isSelected = track.volume >= step && !track.isMuted;
-                      return (
-                        <TouchableOpacity
-                          key={step}
-                          style={[
-                            styles.volStepBtn,
-                            isSelected && { backgroundColor: track.color },
-                          ]}
-                          onPress={() => handleVolumeChange(track.id, step)}
-                        >
-                          <Text
-                            style={[
-                              styles.volStepText,
-                              isSelected && styles.volStepTextActive,
-                            ]}
-                          >
-                            {Math.round(step * 100)}%
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* IMPORT & SEPARATION HUB */}
-        <View style={styles.uploadCard}>
-          {/* TAB SELECTOR */}
-          <View style={styles.importTabRow}>
-            <TouchableOpacity
-              style={[
-                styles.importTabBtn,
-                importTab === 'url' && styles.importTabBtnActive,
-              ]}
-              onPress={() => setImportTab('url')}
-            >
-              <Link2 size={16} color={importTab === 'url' ? '#38bdf8' : '#94a3b8'} />
-              <Text
-                style={[
-                  styles.importTabText,
-                  importTab === 'url' && styles.importTabTextActive,
-                ]}
-              >
-                Paste Link (YouTube / Spotify)
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.importTabBtn,
-                importTab === 'file' && styles.importTabBtnActive,
-              ]}
-              onPress={() => setImportTab('file')}
-            >
-              <UploadCloud size={16} color={importTab === 'file' ? '#38bdf8' : '#94a3b8'} />
-              <Text
-                style={[
-                  styles.importTabText,
-                  importTab === 'file' && styles.importTabTextActive,
-                ]}
-              >
-                Upload File (MP3 / WAV)
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {importTab === 'url' ? (
-            <View style={styles.tabContentContainer}>
-              <View style={styles.badgesRow}>
-                <View style={[styles.platformBadge, { backgroundColor: '#ef444422', borderColor: '#ef444466' }]}>
-                  <Text style={[styles.platformBadgeText, { color: '#ef4444' }]}>YouTube</Text>
-                </View>
-                <View style={[styles.platformBadge, { backgroundColor: '#22c55e22', borderColor: '#22c55e66' }]}>
-                  <Text style={[styles.platformBadgeText, { color: '#22c55e' }]}>Spotify</Text>
-                </View>
-                <View style={[styles.platformBadge, { backgroundColor: '#f9731622', borderColor: '#f9731666' }]}>
-                  <Text style={[styles.platformBadgeText, { color: '#f97316' }]}>SoundCloud / Web</Text>
-                </View>
-              </View>
-
-              <View style={styles.urlInputBox}>
-                <Link2 size={18} color="#64748b" style={{ marginRight: 10 }} />
-                <TextInput
-                  style={styles.urlTextInput}
-                  placeholder="Paste YouTube, Spotify or audio URL..."
-                  placeholderTextColor="#64748b"
-                  value={urlInput}
-                  onChangeText={setUrlInput}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-
+            {/* TAB SELECTOR */}
+            <View style={styles.importTabRow}>
               <TouchableOpacity
-                style={[styles.uploadActionBtn, isProcessingUrl && styles.uploadActionBtnLoading]}
-                onPress={handleProcessUrl}
-                disabled={isProcessingUrl}
+                style={[
+                  styles.importTabBtn,
+                  importTab === 'url' && styles.importTabBtnActive,
+                ]}
+                onPress={() => setImportTab('url')}
               >
-                <Text style={styles.uploadActionBtnText}>
-                  {isProcessingUrl ? 'Extracting Audio & Stems...' : 'Extract & Separate Stems'}
+                <Link2 size={16} color={importTab === 'url' ? '#38bdf8' : '#94a3b8'} />
+                <Text
+                  style={[
+                    styles.importTabText,
+                    importTab === 'url' && styles.importTabTextActive,
+                  ]}
+                >
+                  Paste Link (YouTube / Spotify)
                 </Text>
               </TouchableOpacity>
 
-              {urlStatus !== 'idle' && (
-                <View
+              <TouchableOpacity
+                style={[
+                  styles.importTabBtn,
+                  importTab === 'file' && styles.importTabBtnActive,
+                ]}
+                onPress={() => setImportTab('file')}
+              >
+                <UploadCloud size={16} color={importTab === 'file' ? '#38bdf8' : '#94a3b8'} />
+                <Text
                   style={[
-                    styles.urlStatusCard,
-                    urlStatus === 'loading' && styles.urlStatusCardLoading,
-                    urlStatus === 'success' && styles.urlStatusCardSuccess,
-                    urlStatus === 'error' && styles.urlStatusCardError,
+                    styles.importTabText,
+                    importTab === 'file' && styles.importTabTextActive,
                   ]}
                 >
-                  <View style={styles.urlStatusIconRow}>
-                    {urlStatus === 'loading' && <RotateCcw size={16} color="#38bdf8" />}
-                    {urlStatus === 'success' && <CheckCircle2 size={16} color="#22c55e" />}
-                    {urlStatus === 'error' && <Info size={16} color="#ef4444" />}
-                    <Text
-                      style={[
-                        styles.urlStatusText,
-                        urlStatus === 'loading' && { color: '#38bdf8' },
-                        urlStatus === 'success' && { color: '#22c55e' },
-                        urlStatus === 'error' && { color: '#ef4444' },
-                      ]}
-                    >
-                      {urlStatusMessage}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              <Text style={styles.uploadCardDesc}>
-                Audio will be fetched via <Text style={styles.bold}>yt-dlp</Text> and split into 4 stems using <Text style={styles.bold}>Demucs v4</Text>.
-              </Text>
+                  Upload File (MP3 / WAV)
+                </Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            <View style={styles.tabContentContainer}>
-              {selectedFile ? (
-                <View style={styles.selectedFileCard}>
-                  <View style={styles.selectedFileInfoRow}>
-                    <View style={styles.selectedFileIconBox}>
-                      <Music size={20} color="#38bdf8" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.selectedFileName} numberOfLines={1}>
-                        {selectedFile.name}
-                      </Text>
-                      <Text style={styles.selectedFileSize}>
-                        {selectedFile.size} • Loaded in Player
-                      </Text>
-                    </View>
-                    <TouchableOpacity onPress={handleClearFile} style={styles.clearFileBtn}>
-                      <Trash2 size={16} color="#ef4444" />
-                    </TouchableOpacity>
+
+            {importTab === 'url' ? (
+              <View style={styles.tabContentContainer}>
+                <View style={styles.badgesRow}>
+                  <View style={[styles.platformBadge, { backgroundColor: '#ef444422', borderColor: '#ef444466' }]}>
+                    <Text style={[styles.platformBadgeText, { color: '#ef4444' }]}>YouTube</Text>
                   </View>
-
-                  <View style={styles.selectedFileActionsRow}>
-                    <TouchableOpacity
-                      style={[
-                        styles.uploadActionBtn,
-                        isProcessingFile && styles.uploadActionBtnLoading,
-                      ]}
-                      onPress={handleSeparateUploadedFile}
-                      disabled={isProcessingFile}
-                    >
-                      <Text style={styles.uploadActionBtnText}>
-                        {isProcessingFile ? 'Separating Stems with Demucs...' : 'Separate Stems with Demucs AI'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.changeFileBtn}
-                      onPress={handleChooseFile}
-                    >
-                      <Text style={styles.changeFileBtnText}>Change File</Text>
-                    </TouchableOpacity>
+                  <View style={[styles.platformBadge, { backgroundColor: '#22c55e22', borderColor: '#22c55e66' }]}>
+                    <Text style={[styles.platformBadgeText, { color: '#22c55e' }]}>Spotify</Text>
+                  </View>
+                  <View style={[styles.platformBadge, { backgroundColor: '#f9731622', borderColor: '#f9731666' }]}>
+                    <Text style={[styles.platformBadgeText, { color: '#f97316' }]}>SoundCloud / Web</Text>
                   </View>
                 </View>
-              ) : (
-                <>
-                  <UploadCloud size={32} color="#38bdf8" style={{ marginBottom: 8 }} />
-                  <Text style={styles.uploadCardTitle}>Upload Audio File</Text>
-                  <Text style={styles.uploadCardDesc}>
-                    Supports MP3, WAV, FLAC, M4A up to 50MB. Processed with Demucs AI.
+
+                <View style={styles.urlInputBox}>
+                  <Link2 size={18} color="#64748b" style={{ marginRight: 10 }} />
+                  <TextInput
+                    style={styles.urlTextInput}
+                    placeholder="Paste YouTube, Spotify or audio URL..."
+                    placeholderTextColor="#64748b"
+                    value={urlInput}
+                    onChangeText={setUrlInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.uploadActionBtn, isProcessingUrl && styles.uploadActionBtnLoading]}
+                  onPress={handleProcessUrl}
+                  disabled={isProcessingUrl}
+                >
+                  <Text style={styles.uploadActionBtnText}>
+                    {isProcessingUrl ? 'Extracting Audio & Stems...' : 'Extract & Separate Stems'}
                   </Text>
-                  <TouchableOpacity
-                    style={styles.uploadActionBtn}
-                    onPress={handleChooseFile}
+                </TouchableOpacity>
+
+                {urlStatus !== 'idle' && (
+                  <View
+                    style={[
+                      styles.urlStatusCard,
+                      urlStatus === 'loading' && styles.urlStatusCardLoading,
+                      urlStatus === 'success' && styles.urlStatusCardSuccess,
+                      urlStatus === 'error' && styles.urlStatusCardError,
+                    ]}
                   >
-                    <Text style={styles.uploadActionBtnText}>Choose Audio File</Text>
+                    <View style={styles.urlStatusIconRow}>
+                      {urlStatus === 'loading' && <RotateCcw size={16} color="#38bdf8" />}
+                      {urlStatus === 'success' && <CheckCircle2 size={16} color="#22c55e" />}
+                      {urlStatus === 'error' && <Info size={16} color="#ef4444" />}
+                      <Text
+                        style={[
+                          styles.urlStatusText,
+                          urlStatus === 'loading' && { color: '#38bdf8' },
+                          urlStatus === 'success' && { color: '#22c55e' },
+                          urlStatus === 'error' && { color: '#ef4444' },
+                        ]}
+                      >
+                        {urlStatusMessage}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                <Text style={styles.uploadCardDesc}>
+                  Audio is extracted via <Text style={styles.bold}>yt-dlp</Text> and split into 4 stems using <Text style={styles.bold}>Demucs v4</Text>.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.tabContentContainer}>
+                <UploadCloud size={36} color="#38bdf8" style={{ marginBottom: 10 }} />
+                <Text style={styles.uploadCardTitle}>Choose Audio File from Device</Text>
+                <Text style={styles.uploadCardDesc}>
+                  Supports MP3, WAV, FLAC, M4A up to 50MB. Processed with Demucs AI.
+                </Text>
+                <TouchableOpacity
+                  style={styles.uploadActionBtn}
+                  onPress={handleChooseFile}
+                >
+                  <Text style={styles.uploadActionBtnText}>Choose Audio File</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        ) : (
+          /* ACTIVE SONG PLAYER & CONTROLS */
+          <>
+            {/* TRANSPORT & TRACK CONTROLS */}
+            <View style={styles.playerCard}>
+              <View style={styles.trackInfoRow}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={styles.songTitle} numberOfLines={1}>{songTitle}</Text>
+                  <Text style={styles.artistName} numberOfLines={1}>{songSubtitle}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.changeSongHeaderBtn}
+                  onPress={handleChangeSong}
+                >
+                  <Text style={styles.changeSongHeaderText}>Change Song</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* TIMELINE PROGRESS BAR */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.progressBarBg}
+                onPress={(e) => {
+                  if (Platform.OS === 'web') {
+                    const target = e.currentTarget as unknown as HTMLElement;
+                    const rect = target.getBoundingClientRect();
+                    const nativeEvent = e.nativeEvent as unknown as MouseEvent;
+                    const clickX = nativeEvent.clientX - rect.left;
+                    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+                    handleSeek(ratio);
+                  } else {
+                    handleSeek(0.5);
+                  }
+                }}
+              >
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${Math.min(100, (currentTime / (duration || 1)) * 100)}%` },
+                  ]}
+                />
+              </TouchableOpacity>
+
+              {/* CONTROLS ROW */}
+              <View style={styles.transportRow}>
+                {/* Speed Selector */}
+                <View style={styles.speedGroup}>
+                  {[0.75, 1.0, 1.25].map((speed) => (
+                    <TouchableOpacity
+                      key={speed}
+                      style={[
+                        styles.speedBtn,
+                        playbackSpeed === speed && styles.speedBtnActive,
+                      ]}
+                      onPress={() => changeSpeed(speed)}
+                    >
+                      <Text
+                        style={[
+                          styles.speedText,
+                          playbackSpeed === speed && styles.speedTextActive,
+                        ]}
+                      >
+                        {speed}x
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Play/Pause & Rewind */}
+                <View style={styles.mainControls}>
+                  <TouchableOpacity style={styles.secondaryCtrlBtn} onPress={handleRewind}>
+                    <RotateCcw size={20} color="#cbd5e1" />
                   </TouchableOpacity>
-                </>
-              )}
+
+                  <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
+                    {isPlaying ? (
+                      <Pause size={28} color="#0f172a" />
+                    ) : (
+                      <Play size={28} color="#0f172a" style={{ marginLeft: 3 }} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.timeBadge}>
+                  <Text style={styles.timeText}>
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </Text>
+                </View>
+              </View>
             </View>
-          )}
-        </View>
+
+            {/* PRESET PRACTICE MODES */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Quick Practice Modes</Text>
+              <Text style={styles.sectionHint}>Mute your instrument with a single click</Text>
+            </View>
+
+            <View style={styles.presetRow}>
+              <TouchableOpacity
+                style={[styles.presetButton, activePreset === 'karaoke' && styles.presetButtonActive]}
+                onPress={() => applyPreset('karaoke')}
+              >
+                <Mic size={16} color={activePreset === 'karaoke' ? '#fff' : '#38bdf8'} />
+                <Text style={[styles.presetText, activePreset === 'karaoke' && styles.presetTextActive]}>
+                  Karaoke
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.presetButton, activePreset === 'drums' && styles.presetButtonActive]}
+                onPress={() => applyPreset('drums')}
+              >
+                <Disc size={16} color={activePreset === 'drums' ? '#fff' : '#fb923c'} />
+                <Text style={[styles.presetText, activePreset === 'drums' && styles.presetTextActive]}>
+                  Drums
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.presetButton, activePreset === 'bass' && styles.presetButtonActive]}
+                onPress={() => applyPreset('bass')}
+              >
+                <Activity size={16} color={activePreset === 'bass' ? '#fff' : '#c084fc'} />
+                <Text style={[styles.presetText, activePreset === 'bass' && styles.presetTextActive]}>
+                  Bass
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.presetButton, activePreset === 'guitar' && styles.presetButtonActive]}
+                onPress={() => applyPreset('guitar')}
+              >
+                <Music size={16} color={activePreset === 'guitar' ? '#fff' : '#34d399'} />
+                <Text style={[styles.presetText, activePreset === 'guitar' && styles.presetTextActive]}>
+                  Guitar
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.presetButton, activePreset === 'all' && styles.presetButtonActive]}
+                onPress={() => applyPreset('all')}
+              >
+                <Volume2 size={16} color={activePreset === 'all' ? '#fff' : '#94a3b8'} />
+                <Text style={[styles.presetText, activePreset === 'all' && styles.presetTextActive]}>
+                  All
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 4-STEMS MIXER SECTION */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Multi-Track Stem Mixer</Text>
+              <Text style={styles.sectionHint}>Adjust volume faders, mute or solo any instrument</Text>
+            </View>
+
+            <View style={styles.channelsList}>
+              {tracks.map((track) => {
+                const hasAnySolo = tracks.some((t) => t.isSolo);
+                const isSilenced = track.isMuted || (hasAnySolo && !track.isSolo);
+                const level = levels[track.id] || 0;
+
+                return (
+                  <View key={track.id} style={[styles.channelCard, isSilenced && styles.channelSilenced]}>
+                    <View style={styles.channelHeader}>
+                      <View style={styles.channelLabelGroup}>
+                        <View style={[styles.channelIconBox, { backgroundColor: `${track.color}22` }]}>
+                          {renderIcon(track.id, track.color)}
+                        </View>
+                        <View>
+                          <Text style={styles.channelName}>{track.name}</Text>
+                          <Text style={styles.channelSubtitle}>{track.subtitle}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.channelActions}>
+                        <TouchableOpacity
+                          style={[
+                            styles.toggleBtn,
+                            track.isMuted ? styles.muteBtnActive : styles.toggleBtnInactive,
+                          ]}
+                          onPress={() => handleToggleMute(track.id)}
+                        >
+                          {track.isMuted ? (
+                            <VolumeX size={15} color="#ef4444" />
+                          ) : (
+                            <Volume2 size={15} color="#94a3b8" />
+                          )}
+                          <Text
+                            style={[
+                              styles.toggleBtnText,
+                              track.isMuted && styles.muteTextActive,
+                            ]}
+                          >
+                            MUTE
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.toggleBtn,
+                            track.isSolo ? styles.soloBtnActive : styles.toggleBtnInactive,
+                          ]}
+                          onPress={() => handleToggleSolo(track.id)}
+                        >
+                          <Headphones
+                            size={15}
+                            color={track.isSolo ? '#eab308' : '#94a3b8'}
+                          />
+                          <Text
+                            style={[
+                              styles.toggleBtnText,
+                              track.isSolo && styles.soloTextActive,
+                            ]}
+                          >
+                            SOLO
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={styles.meterContainer}>
+                      <View
+                        style={[
+                          styles.meterBar,
+                          {
+                            width: `${Math.min(100, (isSilenced ? 0 : level) * 100 * (track.volume || 1))}%`,
+                            backgroundColor: track.color,
+                          },
+                        ]}
+                      />
+                    </View>
+
+                    <View style={styles.faderRow}>
+                      <Text style={styles.faderLabel}>Volume</Text>
+                      <View style={styles.volStepContainer}>
+                        {[0, 0.25, 0.5, 0.75, 1.0].map((step) => {
+                          const isSelected = track.volume >= step && !track.isMuted;
+                          return (
+                            <TouchableOpacity
+                              key={step}
+                              style={[
+                                styles.volStepBtn,
+                                isSelected && { backgroundColor: track.color },
+                              ]}
+                              onPress={() => handleVolumeChange(track.id, step)}
+                            >
+                              <Text
+                                style={[
+                                  styles.volStepText,
+                                  isSelected && styles.volStepTextActive,
+                                ]}
+                              >
+                                {Math.round(step * 100)}%
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1433,5 +1403,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
     lineHeight: 18,
+  },
+  sectionHeaderCenter: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#f8fafc',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  heroSubtitle: {
+    fontSize: 12,
+    color: '#94a3b8',
+    textAlign: 'center',
+    maxWidth: 480,
+    lineHeight: 18,
+  },
+  changeSongHeaderBtn: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#38bdf855',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  changeSongHeaderText: {
+    color: '#38bdf8',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

@@ -11,7 +11,7 @@ class StemAudioEngine {
   private isPlaying = false;
   private startTime = 0;
   private pauseOffset = 0;
-  private duration = 16.0; // 16 seconds demo loop
+  private duration = 0;
   private playbackRate = 1.0;
   private isLooping = true;
   private onTimeUpdateCallback: ((time: number) => void) | null = null;
@@ -43,8 +43,6 @@ class StemAudioEngine {
       this.stemGainNodes.set(stem, gain);
       this.stemAnalyzers.set(stem, analyser);
     });
-
-    this.generateDemoStems();
   }
 
   // Synthesizes a high-quality 4-stem practice backing track (120 BPM Funk/Rock)
@@ -198,6 +196,10 @@ class StemAudioEngine {
     this.stemBuffers.set('vocals', vocalBuffer);
   }
 
+  public hasTrack(): boolean {
+    return this.stemBuffers.size > 0;
+  }
+
   public async play(): Promise<void> {
     this.initContext();
     if (!this.ctx) return;
@@ -205,7 +207,7 @@ class StemAudioEngine {
       await this.ctx.resume();
     }
 
-    if (this.isPlaying) return;
+    if (this.isPlaying || this.stemBuffers.size === 0) return;
 
     this.stopAllSources();
 
