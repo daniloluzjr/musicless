@@ -1,0 +1,938 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ScrollView,
+  SafeAreaView,
+  Platform,
+  Alert,
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import {
+  Mic,
+  Disc,
+  Activity,
+  Music,
+  Play,
+  Pause,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+  Headphones,
+  Sliders,
+  Sparkles,
+  Info,
+  UploadCloud,
+} from 'lucide-react-native';
+import { StemTrack, StemType } from './src/types';
+import { audioEngine } from './src/audio/StemAudioEngine';
+
+const INITIAL_TRACKS: StemTrack[] = [
+  {
+    id: 'vocals',
+    name: 'Vocais',
+    subtitle: 'Voz Principal & Coros (Karaokê)',
+    color: '#38bdf8', // Cyan / Light Blue
+    iconName: 'Mic',
+    volume: 0.85,
+    isMuted: false,
+    isSolo: false,
+  },
+  {
+    id: 'drums',
+    name: 'Bateria',
+    subtitle: 'Bombo, Tarola, Pratos (Drumless)',
+    color: '#fb923c', // Orange
+    iconName: 'Disc',
+    volume: 0.9,
+    isMuted: false,
+    isSolo: false,
+  },
+  {
+    id: 'bass',
+    name: 'Baixo',
+    subtitle: 'Linha de Baixo & Sub (Bassless)',
+    color: '#c084fc', // Purple
+    iconName: 'Activity',
+    volume: 0.95,
+    isMuted: false,
+    isSolo: false,
+  },
+  {
+    id: 'other',
+    name: 'Guitarra & Harmonia',
+    subtitle: 'Guitarras, Sintetizadores & Teclas',
+    color: '#34d399', // Emerald
+    iconName: 'Music',
+    volume: 0.8,
+    isMuted: false,
+    isSolo: false,
+  },
+];
+
+export default function App() {
+  const [tracks, setTracks] = useState<StemTrack[]>(INITIAL_TRACKS);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(16.0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+  const [activePreset, setActivePreset] = useState<string>('all');
+  const [levels, setLevels] = useState<Record<StemType, number>>({
+    vocals: 0,
+    drums: 0,
+    bass: 0,
+    other: 0,
+  });
+  const [showInfoModal, setShowInfoModal] = useState(false);
+
+  // Sync with audio engine
+  useEffect(() => {
+    audioEngine.setOnTimeUpdate((time) => {
+      setCurrentTime(time);
+      setDuration(audioEngine.getDuration());
+
+      // Update real-time meters
+      if (audioEngine.getIsPlaying()) {
+        setLevels({
+          vocals: audioEngine.getStemLevel('vocals'),
+          drums: audioEngine.getStemLevel('drums'),
+          bass: audioEngine.getStemLevel('bass'),
+          other: audioEngine.getStemLevel('other'),
+        });
+      }
+    });
+
+    audioEngine.updateMix(tracks);
+  }, []);
+
+  const togglePlay = async () => {
+    if (isPlaying) {
+      audioEngine.pause();
+      setIsPlaying(false);
+    } else {
+      await audioEngine.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const handleRewind = () => {
+    audioEngine.seek(0);
+    setCurrentTime(0);
+  };
+
+  const handleSeek = (ratio: number) => {
+    const newTime = ratio * duration;
+    audioEngine.seek(newTime);
+    setCurrentTime(newTime);
+  };
+
+  const handleVolumeChange = (id: StemType, newVol: number) => {
+    const updated = tracks.map((t) => (t.id === id ? { ...t, volume: newVol } : t));
+    setTracks(updated);
+    audioEngine.updateMix(updated);
+    setActivePreset('custom');
+  };
+
+  const handleToggleMute = (id: StemType) => {
+    const updated = tracks.map((t) => (t.id === id ? { ...t, isMuted: !t.isMuted } : t));
+    setTracks(updated);
+    audioEngine.updateMix(updated);
+    setActivePreset('custom');
+  };
+
+  const handleToggleSolo = (id: StemType) => {
+    const targetTrack = tracks.find((t) => t.id === id);
+    const newSoloState = !targetTrack?.isSolo;
+
+    const updated = tracks.map((t) => (t.id === id ? { ...t, isSolo: newSoloState } : t));
+    setTracks(updated);
+    audioEngine.updateMix(updated);
+    setActivePreset('custom');
+  };
+
+  const applyPreset = (preset: 'all' | 'karaoke' | 'drums' | 'bass' | 'guitar') => {
+    setActivePreset(preset);
+    let updated = tracks.map((t) => ({ ...t, isMuted: false, isSolo: false }));
+
+    if (preset === 'karaoke') {
+      updated = updated.map((t) => (t.id === 'vocals' ? { ...t, isMuted: true } : t));
+    } else if (preset === 'drums') {
+      updated = updated.map((t) => (t.id === 'drums' ? { ...t, isMuted: true } : t));
+    } else if (preset === 'bass') {
+      updated = updated.map((t) => (t.id === 'bass' ? { ...t, isMuted: true } : t));
+    } else if (preset === 'guitar') {
+      updated = updated.map((t) => (t.id === 'other' ? { ...t, isMuted: true } : t));
+    }
+
+    setTracks(updated);
+    audioEngine.updateMix(updated);
+  };
+
+  const changeSpeed = (speed: number) => {
+    setPlaybackSpeed(speed);
+    audioEngine.setPlaybackRate(speed);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const renderIcon = (type: StemType, color: string) => {
+    const size = 22;
+    switch (type) {
+      case 'vocals':
+        return <Mic size={size} color={color} />;
+      case 'drums':
+        return <Disc size={size} color={color} />;
+      case 'bass':
+        return <Activity size={size} color={color} />;
+      case 'other':
+        return <Music size={size} color={color} />;
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="light" />
+
+      {/* HEADER */}
+      <View style={styles.header}>
+        <View style={styles.brandRow}>
+          <View style={styles.logoBadge}>
+            <Sliders size={20} color="#38bdf8" />
+          </View>
+          <View>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>MusicLess</Text>
+              <View style={styles.openSourceTag}>
+                <Text style={styles.openSourceText}>OPEN SOURCE</Text>
+              </View>
+            </View>
+            <Text style={styles.subtitle}>Stem Separation & Prática Musical</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.infoBtn}
+          onPress={() => setShowInfoModal(!showInfoModal)}
+        >
+          <Info size={20} color="#94a3b8" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* INFO MODAL / BANNER */}
+        {showInfoModal && (
+          <View style={styles.infoCard}>
+            <View style={styles.infoTitleRow}>
+              <Sparkles size={18} color="#38bdf8" />
+              <Text style={styles.infoCardTitle}>Arquitetura 100% Free & Open Source</Text>
+            </View>
+            <Text style={styles.infoText}>
+              • <Text style={styles.bold}>Como funciona agora:</Text> O player está rodando uma síntese de 4 faixas em tempo real na Web Audio API com sincronismo perfeito.{'\n'}
+              • <Text style={styles.bold}>Para separar suas músicas:</Text> Utilize o backend gratuito com o modelo <Text style={styles.bold}>Demucs v4</Text> (Meta) via Docker local ou conecte à API do Hugging Face.{'\n'}
+              • <Text style={styles.bold}>Multiplataforma:</Text> Código único React Native com Expo, compilável para Web, Android e iOS.
+            </Text>
+          </View>
+        )}
+
+        {/* PRESET PRACTICE MODES (AÇÕES RÁPIDAS) */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Modos Rápidos de Prática</Text>
+          <Text style={styles.sectionHint}>Silencie seu instrumento em 1 clique</Text>
+        </View>
+
+        <View style={styles.presetRow}>
+          <TouchableOpacity
+            style={[styles.presetButton, activePreset === 'karaoke' && styles.presetButtonActive]}
+            onPress={() => applyPreset('karaoke')}
+          >
+            <Mic size={16} color={activePreset === 'karaoke' ? '#fff' : '#38bdf8'} />
+            <Text style={[styles.presetText, activePreset === 'karaoke' && styles.presetTextActive]}>
+              Karaokê
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.presetButton, activePreset === 'drums' && styles.presetButtonActive]}
+            onPress={() => applyPreset('drums')}
+          >
+            <Disc size={16} color={activePreset === 'drums' ? '#fff' : '#fb923c'} />
+            <Text style={[styles.presetText, activePreset === 'drums' && styles.presetTextActive]}>
+              Bateria
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.presetButton, activePreset === 'bass' && styles.presetButtonActive]}
+            onPress={() => applyPreset('bass')}
+          >
+            <Activity size={16} color={activePreset === 'bass' ? '#fff' : '#c084fc'} />
+            <Text style={[styles.presetText, activePreset === 'bass' && styles.presetTextActive]}>
+              Baixo
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.presetButton, activePreset === 'guitar' && styles.presetButtonActive]}
+            onPress={() => applyPreset('guitar')}
+          >
+            <Music size={16} color={activePreset === 'guitar' ? '#fff' : '#34d399'} />
+            <Text style={[styles.presetText, activePreset === 'guitar' && styles.presetTextActive]}>
+              Guitarra
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.presetButton, activePreset === 'all' && styles.presetButtonActive]}
+            onPress={() => applyPreset('all')}
+          >
+            <Volume2 size={16} color={activePreset === 'all' ? '#fff' : '#94a3b8'} />
+            <Text style={[styles.presetText, activePreset === 'all' && styles.presetTextActive]}>
+              Tudo
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* TRANSPORT & TRACK CONTROLS */}
+        <View style={styles.playerCard}>
+          <View style={styles.trackInfoRow}>
+            <View>
+              <Text style={styles.songTitle}>Funk Groove Demo (120 BPM)</Text>
+              <Text style={styles.artistName}>Faixa Multi-Pistas (4 Stems Demo)</Text>
+            </View>
+            <View style={styles.timeBadge}>
+              <Text style={styles.timeText}>
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </Text>
+            </View>
+          </View>
+
+          {/* TIMELINE PROGRESS BAR */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.progressBarBg}
+            onPress={(e) => {
+              if (Platform.OS === 'web') {
+                const target = e.currentTarget as unknown as HTMLElement;
+                const rect = target.getBoundingClientRect();
+                const nativeEvent = e.nativeEvent as unknown as MouseEvent;
+                const clickX = nativeEvent.clientX - rect.left;
+                const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+                handleSeek(ratio);
+              } else {
+                handleSeek(0.5);
+              }
+            }}
+          >
+            <View
+              style={[
+                styles.progressBarFill,
+                { width: `${Math.min(100, (currentTime / (duration || 1)) * 100)}%` },
+              ]}
+            />
+          </TouchableOpacity>
+
+          {/* CONTROLS ROW */}
+          <View style={styles.transportRow}>
+            {/* Speed Selector */}
+            <View style={styles.speedGroup}>
+              {[0.75, 1.0, 1.25].map((speed) => (
+                <TouchableOpacity
+                  key={speed}
+                  style={[
+                    styles.speedBtn,
+                    playbackSpeed === speed && styles.speedBtnActive,
+                  ]}
+                  onPress={() => changeSpeed(speed)}
+                >
+                  <Text
+                    style={[
+                      styles.speedText,
+                      playbackSpeed === speed && styles.speedTextActive,
+                    ]}
+                  >
+                    {speed}x
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Play/Pause & Rewind */}
+            <View style={styles.mainControls}>
+              <TouchableOpacity style={styles.secondaryCtrlBtn} onPress={handleRewind}>
+                <RotateCcw size={20} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
+                {isPlaying ? (
+                  <Pause size={28} color="#0f172a" />
+                ) : (
+                  <Play size={28} color="#0f172a" style={{ marginLeft: 3 }} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.statusGroup}>
+              <View style={[styles.statusDot, isPlaying && styles.statusDotActive]} />
+              <Text style={styles.statusText}>{isPlaying ? 'TOCANDO' : 'PAUSADO'}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 4-STEMS MIXER SECTION */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Mesa de Mixagem Multi-Pistas (Mixer)</Text>
+          <Text style={styles.sectionHint}>Ajuste volumes, silencie (Mute) ou isole (Solo)</Text>
+        </View>
+
+        <View style={styles.channelsList}>
+          {tracks.map((track) => {
+            const hasAnySolo = tracks.some((t) => t.isSolo);
+            const isSilenced = track.isMuted || (hasAnySolo && !track.isSolo);
+            const level = levels[track.id] || 0;
+
+            return (
+              <View key={track.id} style={[styles.channelCard, isSilenced && styles.channelSilenced]}>
+                {/* Header of Channel */}
+                <View style={styles.channelHeader}>
+                  <View style={styles.channelLabelGroup}>
+                    <View style={[styles.channelIconBox, { backgroundColor: `${track.color}22` }]}>
+                      {renderIcon(track.id, track.color)}
+                    </View>
+                    <View>
+                      <Text style={styles.channelName}>{track.name}</Text>
+                      <Text style={styles.channelSubtitle}>{track.subtitle}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.channelActions}>
+                    {/* MUTE BUTTON */}
+                    <TouchableOpacity
+                      style={[
+                        styles.toggleBtn,
+                        track.isMuted ? styles.muteBtnActive : styles.toggleBtnInactive,
+                      ]}
+                      onPress={() => handleToggleMute(track.id)}
+                    >
+                      {track.isMuted ? (
+                        <VolumeX size={15} color="#ef4444" />
+                      ) : (
+                        <Volume2 size={15} color="#94a3b8" />
+                      )}
+                      <Text
+                        style={[
+                          styles.toggleBtnText,
+                          track.isMuted && styles.muteTextActive,
+                        ]}
+                      >
+                        MUTE
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* SOLO BUTTON */}
+                    <TouchableOpacity
+                      style={[
+                        styles.toggleBtn,
+                        track.isSolo ? styles.soloBtnActive : styles.toggleBtnInactive,
+                      ]}
+                      onPress={() => handleToggleSolo(track.id)}
+                    >
+                      <Headphones
+                        size={15}
+                        color={track.isSolo ? '#eab308' : '#94a3b8'}
+                      />
+                      <Text
+                        style={[
+                          styles.toggleBtnText,
+                          track.isSolo && styles.soloTextActive,
+                        ]}
+                      >
+                        SOLO
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* VU METER LEVEL BAR */}
+                <View style={styles.meterContainer}>
+                  <View
+                    style={[
+                      styles.meterBar,
+                      {
+                        width: `${Math.min(100, (isSilenced ? 0 : level) * 100 * (track.volume || 1))}%`,
+                        backgroundColor: track.color,
+                      },
+                    ]}
+                  />
+                </View>
+
+                {/* VOLUME CONTROLLER */}
+                <View style={styles.faderRow}>
+                  <Text style={styles.faderLabel}>Volume</Text>
+                  <View style={styles.volStepContainer}>
+                    {[0, 0.25, 0.5, 0.75, 1.0].map((step) => {
+                      const isSelected = track.volume >= step && !track.isMuted;
+                      return (
+                        <TouchableOpacity
+                          key={step}
+                          style={[
+                            styles.volStepBtn,
+                            isSelected && { backgroundColor: track.color },
+                          ]}
+                          onPress={() => handleVolumeChange(track.id, step)}
+                        >
+                          <Text
+                            style={[
+                              styles.volStepText,
+                              isSelected && styles.volStepTextActive,
+                            ]}
+                          >
+                            {Math.round(step * 100)}%
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* UPLOAD / EXPANSION BANNER */}
+        <View style={styles.uploadCard}>
+          <UploadCloud size={28} color="#38bdf8" />
+          <Text style={styles.uploadCardTitle}>Separar Novo Áudio (MP3 / WAV)</Text>
+          <Text style={styles.uploadCardDesc}>
+            Para o modo Open Source sustentável: processe suas faixas via Demucs local ou adicione suas chaves gratuitas de API.
+          </Text>
+          <TouchableOpacity
+            style={styles.uploadActionBtn}
+            onPress={() => {
+              Alert.alert(
+                'Próxima Etapa',
+                'O próximo módulo conectará a fila de separação (Demucs / ONNX) para processar qualquer áudio carregado pelo usuário!'
+              );
+            }}
+          >
+            <Text style={styles.uploadActionBtnText}>Importar Arquivo de Áudio</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#090d16',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+    backgroundColor: '#0c1322',
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  logoBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#1e293b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#38bdf833',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#f8fafc',
+    letterSpacing: 0.5,
+  },
+  openSourceTag: {
+    backgroundColor: '#38bdf822',
+    borderColor: '#38bdf866',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  openSourceText: {
+    color: '#38bdf8',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  subtitle: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  infoBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  infoCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#38bdf844',
+  },
+  infoTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  infoCardTitle: {
+    color: '#38bdf8',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  infoText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    lineHeight: 19,
+  },
+  bold: {
+    color: '#f1f5f9',
+    fontWeight: '600',
+  },
+  sectionHeader: {
+    marginVertical: 10,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#f1f5f9',
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  presetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  presetButtonActive: {
+    backgroundColor: '#0284c7',
+    borderColor: '#38bdf8',
+  },
+  presetText: {
+    color: '#cbd5e1',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  presetTextActive: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  playerCard: {
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+    marginBottom: 20,
+  },
+  trackInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  songTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#f9fafb',
+  },
+  artistName: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  timeBadge: {
+    backgroundColor: '#1f2937',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  timeText: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '600',
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: '#1f2937',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#38bdf8',
+    borderRadius: 4,
+  },
+  transportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  speedGroup: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  speedBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#1f2937',
+    borderRadius: 6,
+  },
+  speedBtnActive: {
+    backgroundColor: '#38bdf833',
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+  },
+  speedText: {
+    color: '#9ca3af',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  speedTextActive: {
+    color: '#38bdf8',
+  },
+  mainControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  secondaryCtrlBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#1f2937',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#38bdf8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#64748b',
+  },
+  statusDotActive: {
+    backgroundColor: '#10b981',
+  },
+  statusText: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  channelsList: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  channelCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  channelSilenced: {
+    opacity: 0.45,
+  },
+  channelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  channelLabelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  channelIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  channelName: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  channelSubtitle: {
+    color: '#64748b',
+    fontSize: 11,
+  },
+  channelActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  toggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  toggleBtnInactive: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+  },
+  toggleBtnText: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  muteBtnActive: {
+    backgroundColor: '#ef444422',
+    borderColor: '#ef4444',
+  },
+  muteTextActive: {
+    color: '#ef4444',
+  },
+  soloBtnActive: {
+    backgroundColor: '#eab30822',
+    borderColor: '#eab308',
+  },
+  soloTextActive: {
+    color: '#eab308',
+  },
+  meterContainer: {
+    height: 4,
+    backgroundColor: '#1e293b',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginVertical: 8,
+  },
+  meterBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  faderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  faderLabel: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  volStepContainer: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  volStepBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: '#1e293b',
+    borderRadius: 4,
+  },
+  volStepText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  volStepTextActive: {
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  uploadCard: {
+    backgroundColor: '#0c1322',
+    borderRadius: 14,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#38bdf855',
+  },
+  uploadCardTitle: {
+    color: '#f8fafc',
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  uploadCardDesc: {
+    color: '#64748b',
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  uploadActionBtn: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+  },
+  uploadActionBtnText: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+});

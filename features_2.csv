@@ -1,0 +1,61 @@
+id,module,feature,priority,status,surface,confidence,rules,notes
+F01,account,Sign up / login (email + social),must,todo,all,M,,
+F02,account,Onboarding: instruments / skills / goals,could,todo,all,A,,
+F03,library,Library list with search,must,todo,all,A,,
+F04,library,Upload a single audio file,must,todo,all,A,,
+F05,library,Bulk upload up to 20 files with one separation choice,should,todo,web,A,RN05,web/desktop only; not for mastering
+F06,library,Rename / delete track,must,todo,all,A,,
+F07,processing,Processing job queue with status and progress,must,todo,all,M,,GPU queue; defines cost and latency
+F08,separation,Preset: vocals + instrumental (2 stems),must,todo,all,A,RN02,
+F09,separation,Preset: vocals / drums / bass / other (4 stems),must,todo,all,A,RN02,
+F10,separation,Custom separation by instrument with remainder to Other,should,todo,all,A,RN03,max 6 tracks on mid tier
+F11,separation,Instrument variants (acoustic vs electric guitar / lead vs backing vocals),could,todo,all,A,,
+F12,separation,Change separation on an existing track,should,todo,all,A,RN04,consumes an upload on free tier
+F13,separation,High-fidelity quality tier,could,todo,all,A,,top plan only
+F14,separation,Drum parts model (kick / snare / toms / hats / cymbals),could,todo,all,A,,top plan only
+F15,separation,Multimedia model (dialogue / music / effects),could,todo,all,A,,top plan only
+F16,player,Per-stem volume / mute / solo,must,todo,all,A,,core screen
+F17,player,Waveform timeline and transport controls,must,todo,all,M,,
+F18,player,Speed change without changing pitch,must,todo,all,A,RN06,free
+F19,player,Pitch change in semitones without changing speed,must,todo,all,A,RN06,free
+F20,analysis,BPM and key detection,must,todo,all,A,,
+F21,player,Smart metronome locked to beat grid and following speed,must,todo,all,A,RN07,
+F22,player,Count-in with plan-based maximum (4 / 16 clicks),must,todo,all,A,RN08,
+F23,player,A-B loop,must,todo,all,A,,
+F24,analysis,Song sections detection with click-to-loop,should,todo,all,A,,limited on free tier
+F25,player,Trim,could,todo,all,A,,
+F26,analysis,Chord detection synced to playback,should,todo,all,A,,
+F27,analysis,Chord simplification levels (easy / medium / advanced),could,todo,all,A,RN09,
+F28,analysis,Bars and beats grid display,should,todo,all,A,RN09,
+F29,analysis,Capo mode for guitar,could,todo,all,A,,
+F30,analysis,Displayed chords follow pitch change,should,todo,all,M,RN10,
+F31,lyrics,Synced lyrics transcription with language detection,should,todo,all,A,,paid tiers
+F32,lyrics,Combined chords + lyrics view,could,todo,all,A,,
+F33,player,Persist player state per user per track,should,todo,all,B,RN16,
+F34,export,Export individual stems or custom mix,should,todo,all,M,,
+F35,setlists,Create setlists and order tracks,should,todo,all,A,,
+F36,setlists,Share setlist with members and sync changes in real time,should,todo,all,A,RN11,
+F37,recording,Video recording over a track with synced audio,could,todo,mobile,A,,
+F38,mastering,Mastering against a reference track,could,todo,all,A,RN12,
+F39,mastering,Mastering export: WAV / FLAC / MP3 + bit depth + sample rate,could,todo,all,A,RN12,export gated by plan
+F40,writing,Lyric writer with rhyme / line suggestions,could,todo,all,A,,
+F41,billing,Free tier monthly upload limit with visible counter,must,todo,all,A,RN01,5 per month
+F42,billing,Plan entitlements as a single source of truth,must,todo,all,M,,drives every gate
+F43,billing,Locked features shown with paywall on tap,must,todo,all,B,RN13,
+F44,billing,Web subscription checkout (monthly / yearly),must,todo,web,A,,
+F45,billing,In-app purchase on iOS / Android,should,todo,mobile,A,,
+F46,billing,Manage / cancel subscription,must,todo,all,M,,
+F47,account,Settings: default separation / shortcuts / language,should,todo,all,A,,
+F48,platform,Responsive web app,must,todo,web,A,,
+F49,platform,Native mobile apps,should,todo,mobile,A,,
+F50,legal,Terms of service and takedown policy for uploaded copyrighted music,must,todo,all,B,,user uploads third-party songs
+X01,out,Their trained separation / chord / voice models,out,out,,A,,use commercially licensed models; check weights licence
+X02,out,Voice library of paid professional singers,out,out,,A,,their content and contracts
+X03,out,Partner amp and pedal library,out,out,,A,,their network
+X04,out,Genre / instrument / effect presets,out,out,,A,,content; make our own
+X05,out,Search of purchased music on the device,out,out,,A,,platform integration; later
+X06,out,Studio collaborative DAW,out,out,,A,,separate product; not MVP
+X07,out,DAW plugin (VST),out,out,,A,,later product
+X08,out,Voice conversion and custom voice training,out,out,,A,,
+X09,out,Stem / sample generation by prompt,out,out,,A,,
+X10,out,Import by URL from streaming / video sites,out,out,,B,,rights and terms risk; do not build
