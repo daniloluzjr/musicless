@@ -58,6 +58,8 @@ const InstagramIcon = ({ size = 18, color = '#f8fafc' }: { size?: number; color?
   </Svg>
 );
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+
 const INITIAL_TRACKS: StemTrack[] = [
   {
     id: 'vocals',
@@ -232,19 +234,22 @@ export default function App() {
         return;
       }
       try {
-        const res = await fetch(`http://localhost:8000/track-stems/${trackId}`);
+        const res = await fetch(`${API_BASE_URL}/track-stems/${trackId}`);
         if (!res.ok) return;
         const data = await res.json();
         if (data.is_separated && data.stems) {
           clearInterval(interval);
           setUrlStatusMessage(`Demucs AI completed! Loading 6 isolated studio stems...`);
           const stemBuffers: Partial<Record<StemType, ArrayBuffer>> = {};
+          let loaded = 0;
           await Promise.all(
             (['vocals', 'drums', 'bass', 'piano', 'brass', 'other'] as StemType[]).map(async (stemKey) => {
               const stemUrl = data.stems[stemKey];
               if (stemUrl) {
                 const sRes = await fetch(stemUrl);
                 stemBuffers[stemKey] = await sRes.arrayBuffer();
+                loaded++;
+                setUrlStatusMessage(`Loading 6 isolated studio stems (${loaded}/6)...`);
               }
             })
           );
@@ -278,7 +283,7 @@ export default function App() {
         formData.append('file', selectedFile.rawFile);
       }
 
-      const response = await fetch('http://localhost:8000/separate', {
+      const response = await fetch(`${API_BASE_URL}/separate`, {
         method: 'POST',
         body: formData,
       });
@@ -316,7 +321,7 @@ export default function App() {
     setIsProcessingUrl(true);
 
     try {
-      const response = await fetch('http://localhost:8000/separate-url', {
+      const response = await fetch(`${API_BASE_URL}/separate-url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
