@@ -11,8 +11,11 @@ import {
   TextInput,
   Linking,
   Image,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import {
   Mic,
   Disc,
@@ -34,9 +37,26 @@ import {
   Trash2,
   Piano,
   Wind,
+  Heart,
+  X,
+  ExternalLink,
 } from 'lucide-react-native';
 import { StemTrack, StemType } from './src/types';
 import { audioEngine } from './src/audio/StemAudioEngine';
+
+const GithubIcon = ({ size = 18, color = '#f8fafc' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <Path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+  </Svg>
+);
+
+const InstagramIcon = ({ size = 18, color = '#f8fafc' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+    <Path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <Circle cx="17.5" cy="6.5" r="1.5" fill={color} />
+  </Svg>
+);
 
 const INITIAL_TRACKS: StemTrack[] = [
   {
@@ -117,6 +137,17 @@ export default function App() {
     other: 0,
   });
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [donationAmount, setDonationAmount] = useState('5');
+
+  const handleOpenPayPal = () => {
+    const cleanAmount = donationAmount.trim().replace(/[^0-9.]/g, '');
+    const num = parseFloat(cleanAmount);
+    const url = num && num > 0
+      ? `https://paypal.me/luxdeveloper/${num}EUR`
+      : 'https://paypal.me/luxdeveloper';
+    Linking.openURL(url);
+  };
+
   const [importTab, setImportTab] = useState<'file' | 'url'>('url');
   const [urlInput, setUrlInput] = useState('');
   const [isProcessingUrl, setIsProcessingUrl] = useState(false);
@@ -556,28 +587,136 @@ export default function App() {
 
           <TouchableOpacity
             style={styles.infoBtn}
-            onPress={() => setShowInfoModal(!showInfoModal)}
+            onPress={() => setShowInfoModal(true)}
           >
-            <Info size={19} color="#94a3b8" />
+            <Info size={16} color="#94a3b8" />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* INFO MODAL / BANNER */}
-        {showInfoModal && (
-          <View style={styles.infoCard}>
-            <View style={styles.infoTitleRow}>
-              <Sparkles size={18} color="#38bdf8" />
-              <Text style={styles.infoCardTitle}>100% Free & Open Source Architecture</Text>
+      {/* DONATION & CREATOR POPUP MODAL */}
+      <Modal
+        visible={showInfoModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowInfoModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowInfoModal(false)}
+        >
+          <Pressable
+            style={styles.donationModalCard}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.modalTitleBadge}>
+                <Heart size={18} color="#ef4444" fill="#ef4444" />
+                <Text style={styles.modalTitleText}>Support MusicLess</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowInfoModal(false)}
+              >
+                <X size={18} color="#94a3b8" />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.infoText}>
-              • <Text style={styles.bold}>How it works right now:</Text> The player is running real-time 4-stem synthesis on the Web Audio API with zero latency.{'\n'}
-              • <Text style={styles.bold}>To separate your songs:</Text> Connect to the free backend running <Text style={styles.bold}>Demucs v4</Text> (Meta AI) via local Docker or Hugging Face Spaces API.{'\n'}
-              • <Text style={styles.bold}>Cross-Platform:</Text> Single React Native codebase with Expo, compiling to Web, Android, and iOS.
+
+            {/* Creator Socials */}
+            <View style={styles.socialRow}>
+              <TouchableOpacity
+                style={styles.socialBtn}
+                onPress={() => Linking.openURL('https://github.com/daniloluzjr')}
+              >
+                <GithubIcon size={16} color="#f8fafc" />
+                <Text style={styles.socialBtnText}>GitHub</Text>
+                <ExternalLink size={12} color="#64748b" style={{ marginLeft: 'auto' }} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.socialBtn, styles.instagramBtn]}
+                onPress={() => Linking.openURL('https://instagram.com/luxdeveloper')}
+              >
+                <InstagramIcon size={16} color="#f8fafc" />
+                <Text style={styles.socialBtnText}>Instagram</Text>
+                <ExternalLink size={12} color="#64748b" style={{ marginLeft: 'auto' }} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Message in English */}
+            <Text style={styles.donationDescText}>
+              Help us keep the project open-source & 100% free! Donate to support server infrastructure, model upgrades, and maintenance.
             </Text>
-          </View>
-        )}
+
+            {/* PayPal QR Code */}
+            <View style={styles.qrContainer}>
+              <Image
+                source={require('./assets/paypal_qr.png')}
+                style={styles.qrImage}
+                resizeMode="contain"
+              />
+              <Text style={styles.qrHintText}>Scan with your camera to donate with PayPal</Text>
+            </View>
+
+            {/* Donation Input & Button */}
+            <View style={styles.donationInputGroup}>
+              <View style={styles.donationAmountWrapper}>
+                <Text style={styles.currencySymbol}>€</Text>
+                <TextInput
+                  style={styles.donationInput}
+                  keyboardType="numeric"
+                  value={donationAmount}
+                  onChangeText={setDonationAmount}
+                  placeholder="0"
+                  placeholderTextColor="#64748b"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.donateActionBtn}
+                onPress={handleOpenPayPal}
+              >
+                <Heart size={16} color="#ffffff" fill="#ffffff" />
+                <Text style={styles.donateActionBtnText}>Donate with PayPal</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Amount Chips */}
+            <View style={styles.quickChipsRow}>
+              {['2', '5', '10', '20'].map((val) => (
+                <TouchableOpacity
+                  key={val}
+                  style={[
+                    styles.quickChip,
+                    donationAmount === val && styles.quickChipActive,
+                  ]}
+                  onPress={() => setDonationAmount(val)}
+                >
+                  <Text
+                    style={[
+                      styles.quickChipText,
+                      donationAmount === val && styles.quickChipTextActive,
+                    ]}
+                  >
+                    €{val}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Direct PayPal.me Link */}
+            <TouchableOpacity
+              style={styles.directLinkRow}
+              onPress={() => Linking.openURL('https://paypal.me/luxdeveloper')}
+            >
+              <Text style={styles.directLinkText}>paypal.me/luxdeveloper ↗</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
 
         {/* TRANSPORT & TRACK CONTROLS */}
         <View style={styles.playerCard}>
@@ -1099,9 +1238,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e293b',
     borderWidth: 1,
     borderColor: '#eab30866',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    height: 34,
     borderRadius: 8,
+    justifyContent: 'center',
   },
   starGithubText: {
     color: '#f8fafc',
@@ -1109,41 +1249,196 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   infoBtn: {
-    padding: 8,
+    width: 34,
+    height: 34,
     borderRadius: 8,
     backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
   },
-  infoCard: {
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#38bdf844',
   },
-  infoTitleRow: {
+  donationModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#0f172a',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  modalHeaderRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalTitleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
   },
-  infoCardTitle: {
+  modalTitleText: {
+    color: '#f8fafc',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialRow: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  socialBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  instagramBtn: {
+    borderColor: '#e1306c44',
+  },
+  socialBtnText: {
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  donationDescText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  qrContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  qrImage: {
+    width: 140,
+    height: 140,
+  },
+  qrHintText: {
+    color: '#64748b',
+    fontSize: 11,
+    marginTop: 6,
+    fontWeight: '500',
+  },
+  donationInputGroup: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  donationAmountWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    width: 90,
+  },
+  currencySymbol: {
     color: '#38bdf8',
+    fontSize: 16,
+    fontWeight: '700',
+    marginRight: 4,
+  },
+  donationInput: {
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+    paddingVertical: 8,
+  },
+  donateActionBtn: {
+    flex: 1,
+    backgroundColor: '#0284c7',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+  },
+  donateActionBtnText: {
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
   },
-  infoText: {
+  quickChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  quickChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  quickChipActive: {
+    backgroundColor: '#0284c733',
+    borderColor: '#38bdf8',
+  },
+  quickChipText: {
     color: '#94a3b8',
     fontSize: 12,
-    lineHeight: 19,
-  },
-  bold: {
-    color: '#f1f5f9',
     fontWeight: '600',
+  },
+  quickChipTextActive: {
+    color: '#38bdf8',
+    fontWeight: '700',
+  },
+  directLinkRow: {
+    paddingVertical: 4,
+  },
+  directLinkText: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
   sectionHeader: {
     marginVertical: 10,
