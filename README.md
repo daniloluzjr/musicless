@@ -1,11 +1,12 @@
 # 🎵 MusicLess — Free & Open-Source AI Stem Separation & Practice Mixer
 
 <p align="center">
+  <a href="https://github.com/daniloluzjr/musicless"><img src="https://img.shields.io/github/stars/daniloluzjr/musicless?style=social" alt="GitHub Stars" /></a>
+  <a href="https://github.com/daniloluzjr/musicless"><img src="https://img.shields.io/github/forks/daniloluzjr/musicless?style=social" alt="GitHub Forks" /></a>
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License MIT" />
   <img src="https://img.shields.io/badge/Platform-Web%20%7C%20iOS%20%7C%20Android-informational" alt="Platforms" />
   <img src="https://img.shields.io/badge/Framework-Expo%20%2F%20React%20Native-blueviolet" alt="Expo React Native" />
   <img src="https://img.shields.io/badge/AI%20Model-Meta%20Demucs%20v4-success" alt="Demucs v4" />
-  <img src="https://img.shields.io/badge/Audio-Web%20Audio%20API-orange" alt="Web Audio" />
 </p>
 
 > **The 100% Free & Open-Source Alternative to Moises.ai.**

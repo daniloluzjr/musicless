@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   TextInput,
+  Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -27,6 +28,7 @@ import {
   Info,
   UploadCloud,
   Link2,
+  Star,
 } from 'lucide-react-native';
 import { StemTrack, StemType } from './src/types';
 import { audioEngine } from './src/audio/StemAudioEngine';
@@ -241,12 +243,22 @@ export default function App() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.infoBtn}
-          onPress={() => setShowInfoModal(!showInfoModal)}
-        >
-          <Info size={20} color="#94a3b8" />
-        </TouchableOpacity>
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            style={styles.starGithubBtn}
+            onPress={() => Linking.openURL('https://github.com/daniloluzjr/musicless')}
+          >
+            <Star size={14} color="#eab308" fill="#eab308" />
+            <Text style={styles.starGithubText}>Star on GitHub</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.infoBtn}
+            onPress={() => setShowInfoModal(!showInfoModal)}
+          >
+            <Info size={19} color="#94a3b8" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -693,6 +705,27 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 12,
     color: '#64748b',
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  starGithubBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#eab30866',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  starGithubText: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '700',
   },
   infoBtn: {
     padding: 8,
