@@ -720,7 +720,11 @@ export default function App() {
                 style={[styles.presetButton, activePreset === 'karaoke' && styles.presetButtonActive]}
                 onPress={() => applyPreset('karaoke')}
               >
-                <Mic size={16} color={activePreset === 'karaoke' ? '#fff' : '#38bdf8'} />
+                <Image
+                  source={require('./assets/microfone.png')}
+                  style={{ width: 16, height: 16, tintColor: activePreset === 'karaoke' ? '#fff' : '#38bdf8' }}
+                  resizeMode="contain"
+                />
                 <Text style={[styles.presetText, activePreset === 'karaoke' && styles.presetTextActive]}>
                   Karaoke
                 </Text>
@@ -730,7 +734,11 @@ export default function App() {
                 style={[styles.presetButton, activePreset === 'drums' && styles.presetButtonActive]}
                 onPress={() => applyPreset('drums')}
               >
-                <Disc size={16} color={activePreset === 'drums' ? '#fff' : '#fb923c'} />
+                <Image
+                  source={require('./assets/bateria.png')}
+                  style={{ width: 16, height: 16, tintColor: activePreset === 'drums' ? '#fff' : '#fb923c' }}
+                  resizeMode="contain"
+                />
                 <Text style={[styles.presetText, activePreset === 'drums' && styles.presetTextActive]}>
                   Drums
                 </Text>
@@ -740,7 +748,11 @@ export default function App() {
                 style={[styles.presetButton, activePreset === 'bass' && styles.presetButtonActive]}
                 onPress={() => applyPreset('bass')}
               >
-                <Activity size={16} color={activePreset === 'bass' ? '#fff' : '#c084fc'} />
+                <Image
+                  source={require('./assets/baixo.png')}
+                  style={{ width: 16, height: 16, tintColor: activePreset === 'bass' ? '#fff' : '#c084fc' }}
+                  resizeMode="contain"
+                />
                 <Text style={[styles.presetText, activePreset === 'bass' && styles.presetTextActive]}>
                   Bass
                 </Text>
@@ -750,7 +762,11 @@ export default function App() {
                 style={[styles.presetButton, activePreset === 'piano' && styles.presetButtonActive]}
                 onPress={() => applyPreset('piano')}
               >
-                <Piano size={16} color={activePreset === 'piano' ? '#fff' : '#f43f5e'} />
+                <Image
+                  source={require('./assets/piano.png')}
+                  style={{ width: 16, height: 16, tintColor: activePreset === 'piano' ? '#fff' : '#f43f5e' }}
+                  resizeMode="contain"
+                />
                 <Text style={[styles.presetText, activePreset === 'piano' && styles.presetTextActive]}>
                   Keys / Piano
                 </Text>
@@ -760,7 +776,11 @@ export default function App() {
                 style={[styles.presetButton, activePreset === 'brass' && styles.presetButtonActive]}
                 onPress={() => applyPreset('brass')}
               >
-                <Wind size={16} color={activePreset === 'brass' ? '#fff' : '#eab308'} />
+                <Image
+                  source={require('./assets/corneta.png')}
+                  style={{ width: 16, height: 16, tintColor: activePreset === 'brass' ? '#fff' : '#eab308' }}
+                  resizeMode="contain"
+                />
                 <Text style={[styles.presetText, activePreset === 'brass' && styles.presetTextActive]}>
                   Brass / Sax
                 </Text>
@@ -770,7 +790,11 @@ export default function App() {
                 style={[styles.presetButton, activePreset === 'guitar' && styles.presetButtonActive]}
                 onPress={() => applyPreset('guitar')}
               >
-                <Music size={16} color={activePreset === 'guitar' ? '#fff' : '#34d399'} />
+                <Image
+                  source={require('./assets/guitarra.png')}
+                  style={{ width: 16, height: 16, tintColor: activePreset === 'guitar' ? '#fff' : '#34d399' }}
+                  resizeMode="contain"
+                />
                 <Text style={[styles.presetText, activePreset === 'guitar' && styles.presetTextActive]}>
                   Guitar
                 </Text>
