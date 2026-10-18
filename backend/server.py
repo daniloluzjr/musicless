@@ -47,7 +47,7 @@ app.mount("/audio", StaticFiles(directory=str(UPLOAD_DIR)), name="audio")
 separating_tracks = set()
 
 def run_demucs_separation(audio_path: Path, track_id: str):
-    """Runs Meta Demucs v4 6-stem AI model in the background."""
+    """Runs Meta Demucs v4 6-stem AI model in the background and converts stems to MP3."""
     if track_id in separating_tracks:
         return
     separating_tracks.add(track_id)
@@ -62,11 +62,18 @@ def run_demucs_separation(audio_path: Path, track_id: str):
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
             print(f"[AI Demucs] Successfully finished separation for {track_id}")
-            # If Demucs placed output in audio_path.stem folder and track_id differs, link/copy
             target_folder = OUTPUT_DIR / "htdemucs_6s" / track_id
             src_folder = OUTPUT_DIR / "htdemucs_6s" / audio_path.stem
             if src_folder.exists() and not target_folder.exists():
                 shutil.copytree(src_folder, target_folder)
+
+            # Convert wav stems to lightweight 192k mp3 for instant web streaming
+            final_folder = target_folder if target_folder.exists() else src_folder
+            if final_folder.exists():
+                for wav_f in final_folder.glob("*.wav"):
+                    mp3_f = final_folder / f"{wav_f.stem}.mp3"
+                    if not mp3_f.exists():
+                        subprocess.run(["ffmpeg", "-y", "-i", str(wav_f), "-b:a", "192k", str(mp3_f)], capture_output=True)
         else:
             print(f"[AI Demucs] Error separating {track_id}: {result.stderr}")
     except Exception as e:
@@ -109,24 +116,33 @@ def find_separated_stems(track_id: str):
         candidates.append(OUTPUT_DIR / "htdemucs" / "track_b010e2046c")
     for stem_dir in candidates:
         if stem_dir.exists():
-            vocals = stem_dir / "vocals.wav"
-            drums = stem_dir / "drums.wav"
-            bass = stem_dir / "bass.wav"
-            piano = stem_dir / "piano.wav"
-            guitar = stem_dir / "guitar.wav"
-            other = stem_dir / "other.wav"
+            def get_stem_file(name: str):
+                mp3 = stem_dir / f"{name}.mp3"
+                if mp3.exists():
+                    return mp3
+                wav = stem_dir / f"{name}.wav"
+                if wav.exists():
+                    return wav
+                return None
 
-            if vocals.exists() and drums.exists() and bass.exists():
+            vocals = get_stem_file("vocals")
+            drums = get_stem_file("drums")
+            bass = get_stem_file("bass")
+            piano = get_stem_file("piano")
+            guitar = get_stem_file("guitar")
+            other = get_stem_file("other")
+
+            if vocals and drums and bass:
                 folder = stem_dir.name
                 model = stem_dir.parent.name
                 base = f"http://localhost:8000/separated/{model}/{folder}"
                 return {
-                    "vocals": f"{base}/vocals.wav",
-                    "drums": f"{base}/drums.wav",
-                    "bass": f"{base}/bass.wav",
-                    "piano": f"{base}/piano.wav" if piano.exists() else f"{base}/other.wav",
-                    "brass": f"{base}/other.wav",
-                    "other": f"{base}/guitar.wav" if guitar.exists() else f"{base}/other.wav",
+                    "vocals": f"{base}/{vocals.name}",
+                    "drums": f"{base}/{drums.name}",
+                    "bass": f"{base}/{bass.name}",
+                    "piano": f"{base}/{piano.name}" if piano else f"{base}/{other.name}",
+                    "brass": f"{base}/{other.name}",
+                    "other": f"{base}/{guitar.name}" if guitar else f"{base}/{other.name}",
                 }
     return None
 

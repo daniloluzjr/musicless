@@ -302,17 +302,22 @@ export default function App() {
 
       if (data.stems) {
         setSongSubtitle(`${data.artist} • Demucs v4 AI Studio Stems (6 Tracks Isolated)`);
-        setUrlStatusMessage(`Loading 6 isolated studio stems (Vocals, Drums, Bass, Piano, Brass, Guitar)...`);
+        setUrlStatusMessage(`Loading 6 isolated studio stems (0/6)...`);
+        const stemKeys: StemType[] = ['vocals', 'drums', 'bass', 'piano', 'brass', 'other'];
         const stemBuffers: Partial<Record<StemType, ArrayBuffer>> = {};
+        let loaded = 0;
         await Promise.all(
-          (['vocals', 'drums', 'bass', 'piano', 'brass', 'other'] as StemType[]).map(async (stemKey) => {
+          stemKeys.map(async (stemKey) => {
             const stemUrl = data.stems[stemKey];
             if (stemUrl) {
               const res = await fetch(stemUrl);
               stemBuffers[stemKey] = await res.arrayBuffer();
+              loaded++;
+              setUrlStatusMessage(`Loading 6 isolated studio stems (${loaded}/6)...`);
             }
           })
         );
+        setUrlStatusMessage(`Decoding audio buffers into mixer...`);
         const trackDuration = await audioEngine.loadAllStems(stemBuffers);
         setDuration(trackDuration || data.duration);
         setCurrentTime(0);
@@ -373,6 +378,11 @@ export default function App() {
   }, []);
 
   const togglePlay = async () => {
+    if (isProcessingUrl) {
+      setUrlStatus('loading');
+      setUrlStatusMessage('Downloading and decoding studio stems, please wait a moment...');
+      return;
+    }
     if (!isSongLoaded && duration === 0) {
       setUrlStatus('error');
       setUrlStatusMessage('Please paste a YouTube/Spotify link or choose an audio file first!');
@@ -770,8 +780,14 @@ export default function App() {
                     <RotateCcw size={20} color="#cbd5e1" />
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
-                    {isPlaying ? (
+                  <TouchableOpacity
+                    style={[styles.playBtn, isProcessingUrl && { opacity: 0.6 }]}
+                    onPress={togglePlay}
+                    disabled={isProcessingUrl}
+                  >
+                    {isProcessingUrl ? (
+                      <RotateCcw size={24} color="#0f172a" />
+                    ) : isPlaying ? (
                       <Pause size={28} color="#0f172a" />
                     ) : (
                       <Play size={28} color="#0f172a" style={{ marginLeft: 3 }} />
