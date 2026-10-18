@@ -268,6 +268,11 @@ export default function App() {
   }, []);
 
   const togglePlay = async () => {
+    if (!isSongLoaded && duration === 0) {
+      setUrlStatus('error');
+      setUrlStatusMessage('Please paste a YouTube/Spotify link or choose an audio file first!');
+      return;
+    }
     if (isPlaying) {
       audioEngine.pause();
       setIsPlaying(false);
@@ -410,156 +415,155 @@ export default function App() {
           </View>
         )}
 
-        {!isSongLoaded ? (
-          /* TOP INPUT HUB (IN PLACE OF TEST MUSIC DIV) */
-          <View style={styles.uploadCard}>
-            <View style={styles.sectionHeaderCenter}>
-              <Text style={styles.heroTitle}>Load Song to Practice</Text>
-              <Text style={styles.heroSubtitle}>
-                Paste a link from YouTube Music / Spotify or choose an audio file to mute instruments and play along!
-              </Text>
-            </View>
-
-            {/* TAB SELECTOR */}
-            <View style={styles.importTabRow}>
-              <TouchableOpacity
-                style={[
-                  styles.importTabBtn,
-                  importTab === 'url' && styles.importTabBtnActive,
-                ]}
-                onPress={() => setImportTab('url')}
-              >
-                <Link2 size={16} color={importTab === 'url' ? '#38bdf8' : '#94a3b8'} />
-                <Text
-                  style={[
-                    styles.importTabText,
-                    importTab === 'url' && styles.importTabTextActive,
-                  ]}
-                >
-                  Paste Link (YouTube / Spotify)
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.importTabBtn,
-                  importTab === 'file' && styles.importTabBtnActive,
-                ]}
-                onPress={() => setImportTab('file')}
-              >
-                <UploadCloud size={16} color={importTab === 'file' ? '#38bdf8' : '#94a3b8'} />
-                <Text
-                  style={[
-                    styles.importTabText,
-                    importTab === 'file' && styles.importTabTextActive,
-                  ]}
-                >
-                  Upload File (MP3 / WAV)
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {importTab === 'url' ? (
-              <View style={styles.tabContentContainer}>
-                <View style={styles.badgesRow}>
+        {/* TRANSPORT & TRACK CONTROLS */}
+        <View style={styles.playerCard}>
+          {!isSongLoaded ? (
+            /* IN-PLAYER INPUT HUB (REPLACES TEST SONG) */
+            <View style={styles.trackInputHub}>
+              <View style={styles.hubHeaderRow}>
+                <View style={styles.hubTitleGroup}>
+                  <Music size={16} color="#38bdf8" />
+                  <Text style={styles.hubTitle}>Load Song to Practice</Text>
+                </View>
+                <View style={styles.badgesRowCompact}>
                   <View style={[styles.platformBadge, { backgroundColor: '#ef444422', borderColor: '#ef444466' }]}>
                     <Text style={[styles.platformBadgeText, { color: '#ef4444' }]}>YouTube</Text>
                   </View>
                   <View style={[styles.platformBadge, { backgroundColor: '#22c55e22', borderColor: '#22c55e66' }]}>
                     <Text style={[styles.platformBadgeText, { color: '#22c55e' }]}>Spotify</Text>
                   </View>
-                  <View style={[styles.platformBadge, { backgroundColor: '#f9731622', borderColor: '#f9731666' }]}>
-                    <Text style={[styles.platformBadgeText, { color: '#f97316' }]}>SoundCloud / Web</Text>
+                  <View style={[styles.platformBadge, { backgroundColor: '#38bdf822', borderColor: '#38bdf866' }]}>
+                    <Text style={[styles.platformBadgeText, { color: '#38bdf8' }]}>MP3/WAV</Text>
                   </View>
                 </View>
+              </View>
 
-                <View style={styles.urlInputBox}>
-                  <Link2 size={18} color="#64748b" style={{ marginRight: 10 }} />
-                  <TextInput
-                    style={styles.urlTextInput}
-                    placeholder="Paste YouTube, Spotify or audio URL..."
-                    placeholderTextColor="#64748b"
-                    value={urlInput}
-                    onChangeText={setUrlInput}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-
+              {/* TAB SELECTOR */}
+              <View style={styles.importTabRowCompact}>
                 <TouchableOpacity
-                  style={[styles.uploadActionBtn, isProcessingUrl && styles.uploadActionBtnLoading]}
-                  onPress={handleProcessUrl}
-                  disabled={isProcessingUrl}
+                  style={[
+                    styles.importTabBtnCompact,
+                    importTab === 'url' && styles.importTabBtnActive,
+                  ]}
+                  onPress={() => setImportTab('url')}
                 >
-                  <Text style={styles.uploadActionBtnText}>
-                    {isProcessingUrl ? 'Extracting Audio & Stems...' : 'Extract & Separate Stems'}
+                  <Link2 size={13} color={importTab === 'url' ? '#38bdf8' : '#94a3b8'} />
+                  <Text
+                    style={[
+                      styles.importTabTextCompact,
+                      importTab === 'url' && styles.importTabTextActive,
+                    ]}
+                  >
+                    Paste Link (YouTube / Spotify)
                   </Text>
                 </TouchableOpacity>
 
-                {urlStatus !== 'idle' && (
-                  <View
+                <TouchableOpacity
+                  style={[
+                    styles.importTabBtnCompact,
+                    importTab === 'file' && styles.importTabBtnActive,
+                  ]}
+                  onPress={() => setImportTab('file')}
+                >
+                  <UploadCloud size={13} color={importTab === 'file' ? '#38bdf8' : '#94a3b8'} />
+                  <Text
                     style={[
-                      styles.urlStatusCard,
-                      urlStatus === 'loading' && styles.urlStatusCardLoading,
-                      urlStatus === 'success' && styles.urlStatusCardSuccess,
-                      urlStatus === 'error' && styles.urlStatusCardError,
+                      styles.importTabTextCompact,
+                      importTab === 'file' && styles.importTabTextActive,
                     ]}
                   >
-                    <View style={styles.urlStatusIconRow}>
-                      {urlStatus === 'loading' && <RotateCcw size={16} color="#38bdf8" />}
-                      {urlStatus === 'success' && <CheckCircle2 size={16} color="#22c55e" />}
-                      {urlStatus === 'error' && <Info size={16} color="#ef4444" />}
-                      <Text
-                        style={[
-                          styles.urlStatusText,
-                          urlStatus === 'loading' && { color: '#38bdf8' },
-                          urlStatus === 'success' && { color: '#22c55e' },
-                          urlStatus === 'error' && { color: '#ef4444' },
-                        ]}
-                      >
-                        {urlStatusMessage}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                <Text style={styles.uploadCardDesc}>
-                  Audio is extracted via <Text style={styles.bold}>yt-dlp</Text> and split into 4 stems using <Text style={styles.bold}>Demucs v4</Text>.
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.tabContentContainer}>
-                <UploadCloud size={36} color="#38bdf8" style={{ marginBottom: 10 }} />
-                <Text style={styles.uploadCardTitle}>Choose Audio File from Device</Text>
-                <Text style={styles.uploadCardDesc}>
-                  Supports MP3, WAV, FLAC, M4A up to 50MB. Processed with Demucs AI.
-                </Text>
-                <TouchableOpacity
-                  style={styles.uploadActionBtn}
-                  onPress={handleChooseFile}
-                >
-                  <Text style={styles.uploadActionBtnText}>Choose Audio File</Text>
+                    Upload Audio File
+                  </Text>
                 </TouchableOpacity>
               </View>
-            )}
-          </View>
-        ) : (
-          /* ACTIVE SONG PLAYER & CONTROLS */
-          <>
-            {/* TRANSPORT & TRACK CONTROLS */}
-            <View style={styles.playerCard}>
-              <View style={styles.trackInfoRow}>
-                <View style={{ flex: 1, marginRight: 10 }}>
+
+              {importTab === 'url' ? (
+                <View>
+                  <View style={styles.urlInputRow}>
+                    <View style={styles.urlInputBoxCompact}>
+                      <Link2 size={16} color="#64748b" style={{ marginRight: 8 }} />
+                      <TextInput
+                        style={styles.urlTextInput}
+                        placeholder="Paste YouTube, YouTube Music or Spotify link..."
+                        placeholderTextColor="#64748b"
+                        value={urlInput}
+                        onChangeText={setUrlInput}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        onSubmitEditing={handleProcessUrl}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.loadSongBtn, isProcessingUrl && styles.loadSongBtnLoading]}
+                      onPress={handleProcessUrl}
+                      disabled={isProcessingUrl}
+                    >
+                      <Text style={styles.loadSongBtnText}>
+                        {isProcessingUrl ? 'Extracting...' : 'Load & Separate'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {urlStatus !== 'idle' && (
+                    <View
+                      style={[
+                        styles.urlStatusCardCompact,
+                        urlStatus === 'loading' && styles.urlStatusCardLoading,
+                        urlStatus === 'success' && styles.urlStatusCardSuccess,
+                        urlStatus === 'error' && styles.urlStatusCardError,
+                      ]}
+                    >
+                      <View style={styles.urlStatusIconRow}>
+                        {urlStatus === 'loading' && <RotateCcw size={14} color="#38bdf8" />}
+                        {urlStatus === 'success' && <CheckCircle2 size={14} color="#22c55e" />}
+                        {urlStatus === 'error' && <Info size={14} color="#ef4444" />}
+                        <Text
+                          style={[
+                            styles.urlStatusTextCompact,
+                            urlStatus === 'loading' && { color: '#38bdf8' },
+                            urlStatus === 'success' && { color: '#22c55e' },
+                            urlStatus === 'error' && { color: '#ef4444' },
+                          ]}
+                        >
+                          {urlStatusMessage}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.fileInputRow}>
+                  <TouchableOpacity
+                    style={styles.chooseFileBtn}
+                    onPress={handleChooseFile}
+                  >
+                    <UploadCloud size={16} color="#38bdf8" />
+                    <Text style={styles.chooseFileBtnText}>Choose Audio File from Device (MP3 / WAV / FLAC / M4A)</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          ) : (
+            /* NOW PLAYING TRACK INFO */
+            <View style={styles.nowPlayingRow}>
+              <View style={styles.nowPlayingInfo}>
+                <View style={styles.liveIndicator}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>READY</Text>
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.songTitle} numberOfLines={1}>{songTitle}</Text>
                   <Text style={styles.artistName} numberOfLines={1}>{songSubtitle}</Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.changeSongHeaderBtn}
-                  onPress={handleChangeSong}
-                >
-                  <Text style={styles.changeSongHeaderText}>Change Song</Text>
-                </TouchableOpacity>
               </View>
+              <TouchableOpacity
+                style={styles.changeSongHeaderBtn}
+                onPress={handleChangeSong}
+              >
+                <Text style={styles.changeSongHeaderText}>Change Song</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
               {/* TIMELINE PROGRESS BAR */}
               <TouchableOpacity
@@ -806,8 +810,6 @@ export default function App() {
                 );
               })}
             </View>
-          </>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1434,5 +1436,158 @@ const styles = StyleSheet.create({
     color: '#38bdf8',
     fontSize: 11,
     fontWeight: '700',
+  },
+  trackInputHub: {
+    backgroundColor: '#0c1322',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#38bdf833',
+    marginBottom: 16,
+  },
+  hubHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  hubTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  hubTitle: {
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  badgesRowCompact: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  importTabRowCompact: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  importTabBtnCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  importTabTextCompact: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  urlInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  urlInputBoxCompact: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  loadSongBtn: {
+    backgroundColor: '#0284c7',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadSongBtnLoading: {
+    opacity: 0.6,
+  },
+  loadSongBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  fileInputRow: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  chooseFileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#38bdf866',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  chooseFileBtnText: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  urlStatusCardCompact: {
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+    borderWidth: 1,
+  },
+  urlStatusTextCompact: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 16,
+  },
+  nowPlayingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  nowPlayingInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginRight: 10,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#22c55e1a',
+    borderColor: '#22c55e66',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22c55e',
+  },
+  liveText: {
+    color: '#22c55e',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });
