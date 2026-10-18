@@ -10,6 +10,7 @@ import {
   Alert,
   TextInput,
   Linking,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -380,17 +381,53 @@ export default function App() {
     const size = 22;
     switch (type) {
       case 'vocals':
-        return <Mic size={size} color={color} />;
+        return (
+          <Image
+            source={require('./assets/microfone.png')}
+            style={{ width: size, height: size, tintColor: color }}
+            resizeMode="contain"
+          />
+        );
       case 'drums':
-        return <Disc size={size} color={color} />;
+        return (
+          <Image
+            source={require('./assets/bateria.png')}
+            style={{ width: size, height: size, tintColor: color }}
+            resizeMode="contain"
+          />
+        );
       case 'bass':
-        return <Activity size={size} color={color} />;
+        return (
+          <Image
+            source={require('./assets/baixo.png')}
+            style={{ width: size, height: size, tintColor: color }}
+            resizeMode="contain"
+          />
+        );
       case 'piano':
-        return <Piano size={size} color={color} />;
+        return (
+          <Image
+            source={require('./assets/piano.png')}
+            style={{ width: size, height: size, tintColor: color }}
+            resizeMode="contain"
+          />
+        );
       case 'brass':
-        return <Wind size={size} color={color} />;
+        return (
+          <Image
+            source={require('./assets/corneta.png')}
+            style={{ width: size, height: size, tintColor: color }}
+            resizeMode="contain"
+          />
+        );
       case 'other':
-        return <Music size={size} color={color} />;
+        return (
+          <Image
+            source={require('./assets/guitarra.png')}
+            style={{ width: size, height: size, tintColor: color }}
+            resizeMode="contain"
+          />
+        );
     }
   };
 

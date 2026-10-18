@@ -4,9 +4,14 @@ class StemAudioEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private stemGainNodes: Map<StemType, GainNode> = new Map();
+  private stemFilters: Map<StemType, BiquadFilterNode> = new Map();
   private stemSources: Map<StemType, AudioBufferSourceNode> = new Map();
   private stemBuffers: Map<StemType, AudioBuffer> = new Map();
   private stemAnalyzers: Map<StemType, AnalyserNode> = new Map();
+
+  private fullTrackBuffer: AudioBuffer | null = null;
+  private fullTrackSource: AudioBufferSourceNode | null = null;
+  private hasDedicatedStems = false;
 
   private isPlaying = false;
   private startTime = 0;
@@ -17,13 +22,13 @@ class StemAudioEngine {
   private onTimeUpdateCallback: ((time: number) => void) | null = null;
   private animationFrameId: number | null = null;
 
-  constructor() {
-    // Lazy init on first user gesture
-  }
+  constructor() {}
 
   private initContext() {
     if (this.ctx) return;
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
 
     this.ctx = new AudioContextClass();
@@ -31,173 +36,58 @@ class StemAudioEngine {
     this.masterGain.connect(this.ctx.destination);
 
     const stemTypes: StemType[] = ['vocals', 'drums', 'bass', 'piano', 'brass', 'other'];
-    stemTypes.forEach(stem => {
+    stemTypes.forEach((stem) => {
       if (!this.ctx || !this.masterGain) return;
+
       const gain = this.ctx.createGain();
       const analyser = this.ctx.createAnalyser();
       analyser.fftSize = 64;
 
+      // Create crossover band filter for instant multi-stem practice
+      let filter: BiquadFilterNode = this.ctx.createBiquadFilter();
+
+      if (stem === 'bass') {
+        // Bassline & Kick low end: Cutoff 250Hz
+        filter.type = 'lowpass';
+        filter.frequency.value = 260;
+      } else if (stem === 'piano') {
+        // Keyboards / Piano: Body & chords 250Hz - 1100Hz
+        filter.type = 'bandpass';
+        filter.frequency.value = 650;
+        filter.Q.value = 0.9;
+      } else if (stem === 'vocals') {
+        // Vocals: Main vocal intelligibility band 1000Hz - 3200Hz
+        filter.type = 'bandpass';
+        filter.frequency.value = 1750;
+        filter.Q.value = 0.8;
+      } else if (stem === 'brass') {
+        // Brass & Horns: Saxophone & trumpet punch 1800Hz - 4200Hz
+        filter.type = 'bandpass';
+        filter.frequency.value = 2900;
+        filter.Q.value = 1.1;
+      } else if (stem === 'drums') {
+        // Drums & Percussion: High-pass transients & cymbals > 3600Hz
+        filter.type = 'highpass';
+        filter.frequency.value = 3600;
+      } else {
+        // Guitars & Other: Stereo / high-mid presence
+        filter.type = 'peaking';
+        filter.frequency.value = 2400;
+        filter.gain.value = 2.0;
+      }
+
+      filter.connect(gain);
       gain.connect(analyser);
       analyser.connect(this.masterGain);
 
+      this.stemFilters.set(stem, filter);
       this.stemGainNodes.set(stem, gain);
       this.stemAnalyzers.set(stem, analyser);
     });
   }
 
-  // Synthesizes a high-quality 4-stem practice backing track (120 BPM Funk/Rock)
-  private generateDemoStems() {
-    if (!this.ctx) return;
-    const sampleRate = this.ctx.sampleRate;
-    const bpm = 120;
-    const secondsPerBeat = 60 / bpm;
-    const totalBars = 8;
-    const totalBeats = totalBars * 4;
-    const length = Math.floor(totalBeats * secondsPerBeat * sampleRate);
-    this.duration = totalBeats * secondsPerBeat;
-
-    // 1. DRUMS BUFFER
-    const drumBuffer = this.ctx.createBuffer(2, length, sampleRate);
-    const drumL = drumBuffer.getChannelData(0);
-    const drumR = drumBuffer.getChannelData(1);
-
-    // 2. BASS BUFFER
-    const bassBuffer = this.ctx.createBuffer(2, length, sampleRate);
-    const bassL = bassBuffer.getChannelData(0);
-    const bassR = bassBuffer.getChannelData(1);
-
-    // 3. OTHER (GUITAR / KEYS) BUFFER
-    const otherBuffer = this.ctx.createBuffer(2, length, sampleRate);
-    const otherL = otherBuffer.getChannelData(0);
-    const otherR = otherBuffer.getChannelData(1);
-
-    // 4. VOCALS BUFFER
-    const vocalBuffer = this.ctx.createBuffer(2, length, sampleRate);
-    const vocalL = vocalBuffer.getChannelData(0);
-    const vocalR = vocalBuffer.getChannelData(1);
-
-    for (let beat = 0; beat < totalBeats; beat++) {
-      const beatTime = beat * secondsPerBeat;
-      const beatSample = Math.floor(beatTime * sampleRate);
-      const isDownbeat = beat % 4 === 0;
-      const isBackbeat = beat % 4 === 2;
-
-      // --- DRUMS SYNTHESIS ---
-      // Kick on 1 and 3
-      if (isDownbeat || beat % 4 === 2) {
-        const kickDuration = Math.min(Math.floor(0.25 * sampleRate), length - beatSample);
-        for (let i = 0; i < kickDuration; i++) {
-          const t = i / sampleRate;
-          const freq = 120 * Math.exp(-t * 18);
-          const env = Math.exp(-t * 12);
-          const sample = Math.sin(2 * Math.PI * freq * t) * env * 0.8;
-          drumL[beatSample + i] += sample;
-          drumR[beatSample + i] += sample;
-        }
-      }
-
-      // Snare on 2 and 4
-      if (beat % 4 === 1 || beat % 4 === 3) {
-        const snareDuration = Math.min(Math.floor(0.22 * sampleRate), length - beatSample);
-        for (let i = 0; i < snareDuration; i++) {
-          const t = i / sampleRate;
-          const tone = Math.sin(2 * Math.PI * 180 * t) * Math.exp(-t * 20);
-          const noise = (Math.random() * 2 - 1) * Math.exp(-t * 15);
-          const sample = (tone * 0.4 + noise * 0.6) * 0.7;
-          drumL[beatSample + i] += sample;
-          drumR[beatSample + i] += sample;
-        }
-      }
-
-      // Hi-Hats every 8th note
-      for (let eighth = 0; eighth < 2; eighth++) {
-        const hatSample = beatSample + Math.floor(eighth * 0.5 * secondsPerBeat * sampleRate);
-        const hatDuration = Math.min(Math.floor(0.06 * sampleRate), length - hatSample);
-        for (let i = 0; i < hatDuration; i++) {
-          const t = i / sampleRate;
-          const noise = (Math.random() * 2 - 1) * Math.exp(-t * 50);
-          drumL[hatSample + i] += noise * 0.25;
-          drumR[hatSample + i] += noise * 0.25;
-        }
-      }
-
-      // --- BASS SYNTHESIS (Progression: Am - F - C - G) ---
-      const bar = Math.floor(beat / 4) % 4;
-      const bassFreqs = [55.0, 43.65, 65.41, 49.0]; // A1, F1, C2, G1
-      const rootFreq = bassFreqs[bar];
-      const bassNoteDuration = Math.floor(secondsPerBeat * 0.85 * sampleRate);
-      for (let i = 0; i < bassNoteDuration; i++) {
-        const idx = beatSample + i;
-        if (idx >= length) break;
-        const t = i / sampleRate;
-        const env = Math.exp(-t * 2.5);
-        // Slap bass / warm sub
-        const fund = Math.sin(2 * Math.PI * rootFreq * t);
-        const harm = Math.sin(2 * Math.PI * rootFreq * 2 * t) * 0.4;
-        const sample = (fund + harm) * env * 0.5;
-        bassL[idx] += sample;
-        bassR[idx] += sample;
-      }
-
-      // --- GUITAR / CHORDS (Other) ---
-      const chordNotes = [
-        [220, 261.63, 329.63], // Am (A, C, E)
-        [174.61, 220, 261.63], // F (F, A, C)
-        [261.63, 329.63, 392], // C (C, E, G)
-        [196, 246.94, 293.66], // G (G, B, D)
-      ][bar];
-
-      const strumOffset = (beat % 2 === 1) ? 0 : Math.floor(0.03 * sampleRate);
-      const chordDuration = Math.floor(secondsPerBeat * 0.9 * sampleRate);
-      for (let i = 0; i < chordDuration; i++) {
-        const idx = beatSample + strumOffset + i;
-        if (idx >= length) break;
-        const t = i / sampleRate;
-        const env = Math.exp(-t * 3.0);
-        let sample = 0;
-        chordNotes.forEach((f, cIdx) => {
-          // Acoustic/electric rhythm pluck
-          sample += (Math.sin(2 * Math.PI * f * t) + 0.3 * Math.sin(2 * Math.PI * f * 2 * t)) / chordNotes.length;
-        });
-        otherL[idx] += sample * env * 0.35;
-        otherR[idx] += sample * env * 0.35;
-      }
-
-      // --- VOCALS (Lead vocal melody / singing synth formant) ---
-      const vocalMelody = [
-        440, 493.88, 523.25, 493.88, // A4, B4, C5, B4
-        349.23, 392.00, 440.00, 392.00, // F4, G4, A4, G4
-        523.25, 587.33, 659.25, 587.33, // C5, D5, E5, D5
-        392.00, 440.00, 493.88, 440.00  // G4, A4, B4, A4
-      ][beat % 16];
-
-      const vocalDuration = Math.floor(secondsPerBeat * 0.9 * sampleRate);
-      for (let i = 0; i < vocalDuration; i++) {
-        const idx = beatSample + i;
-        if (idx >= length) break;
-        const t = i / sampleRate;
-        // Warm vocal vibrato
-        const vibrato = 1.0 + 0.015 * Math.sin(2 * Math.PI * 5.5 * t);
-        const f = vocalMelody * vibrato;
-        // Human voice vowel simulation (formant rich)
-        const v1 = Math.sin(2 * Math.PI * f * t);
-        const v2 = 0.5 * Math.sin(2 * Math.PI * f * 2 * t);
-        const v3 = 0.25 * Math.sin(2 * Math.PI * f * 3 * t);
-        const env = Math.sin((i / vocalDuration) * Math.PI); // Smooth in and out
-        const sample = (v1 + v2 + v3) * env * 0.28;
-        vocalL[idx] += sample;
-        vocalR[idx] += sample;
-      }
-    }
-
-    this.stemBuffers.set('drums', drumBuffer);
-    this.stemBuffers.set('bass', bassBuffer);
-    this.stemBuffers.set('other', otherBuffer);
-    this.stemBuffers.set('vocals', vocalBuffer);
-  }
-
   public hasTrack(): boolean {
-    return this.stemBuffers.size > 0;
+    return this.fullTrackBuffer !== null || this.stemBuffers.size > 0;
   }
 
   public async play(): Promise<void> {
@@ -207,28 +97,47 @@ class StemAudioEngine {
       await this.ctx.resume();
     }
 
-    if (this.isPlaying || this.stemBuffers.size === 0) return;
+    if (this.isPlaying || (!this.fullTrackBuffer && this.stemBuffers.size === 0)) return;
 
     this.stopAllSources();
-
-    this.startTime = this.ctx.currentTime - (this.pauseOffset / this.playbackRate);
+    this.startTime = this.ctx.currentTime - this.pauseOffset / this.playbackRate;
 
     const stemTypes: StemType[] = ['vocals', 'drums', 'bass', 'piano', 'brass', 'other'];
-    stemTypes.forEach(stem => {
-      const buffer = this.stemBuffers.get(stem);
-      const gainNode = this.stemGainNodes.get(stem);
-      if (!this.ctx || !buffer || !gainNode) return;
 
-      const source = this.ctx.createBufferSource();
-      source.buffer = buffer;
-      source.loop = this.isLooping;
-      source.playbackRate.value = this.playbackRate;
-      source.connect(gainNode);
+    if (this.hasDedicatedStems) {
+      // Direct dedicated isolated stems from Demucs AI
+      stemTypes.forEach((stem) => {
+        const buffer = this.stemBuffers.get(stem);
+        const gainNode = this.stemGainNodes.get(stem);
+        if (!this.ctx || !buffer || !gainNode) return;
 
-      const offset = (this.pauseOffset % this.duration);
-      source.start(0, offset);
-      this.stemSources.set(stem, source);
-    });
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = this.isLooping;
+        source.playbackRate.value = this.playbackRate;
+        source.connect(gainNode);
+
+        const offset = this.pauseOffset % this.duration;
+        source.start(0, offset);
+        this.stemSources.set(stem, source);
+      });
+    } else if (this.fullTrackBuffer) {
+      // Connect full track source through all 6 parallel stem crossover filters
+      this.fullTrackSource = this.ctx.createBufferSource();
+      this.fullTrackSource.buffer = this.fullTrackBuffer;
+      this.fullTrackSource.loop = this.isLooping;
+      this.fullTrackSource.playbackRate.value = this.playbackRate;
+
+      stemTypes.forEach((stem) => {
+        const filter = this.stemFilters.get(stem);
+        if (filter && this.fullTrackSource) {
+          this.fullTrackSource.connect(filter);
+        }
+      });
+
+      const offset = this.pauseOffset % this.duration;
+      this.fullTrackSource.start(0, offset);
+    }
 
     this.isPlaying = true;
     this.startTimeTracking();
@@ -265,7 +174,10 @@ class StemAudioEngine {
 
   public setPlaybackRate(rate: number): void {
     this.playbackRate = rate;
-    this.stemSources.forEach(source => {
+    if (this.fullTrackSource) {
+      this.fullTrackSource.playbackRate.value = rate;
+    }
+    this.stemSources.forEach((source) => {
       source.playbackRate.value = rate;
     });
   }
@@ -273,14 +185,14 @@ class StemAudioEngine {
   public setStemVolume(stem: StemType, volume: number): void {
     const gainNode = this.stemGainNodes.get(stem);
     if (gainNode && this.ctx) {
-      gainNode.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), this.ctx.currentTime);
+      gainNode.gain.setValueAtTime(Math.max(0, Math.min(1.5, volume)), this.ctx.currentTime);
     }
   }
 
   public updateMix(tracks: { id: StemType; volume: number; isMuted: boolean; isSolo: boolean }[]): void {
-    const hasAnySolo = tracks.some(t => t.isSolo);
+    const hasAnySolo = tracks.some((t) => t.isSolo);
 
-    tracks.forEach(t => {
+    tracks.forEach((t) => {
       let effectiveVol = t.volume;
       if (t.isMuted) {
         effectiveVol = 0;
@@ -308,6 +220,7 @@ class StemAudioEngine {
     if (!this.ctx) return;
     const decodedBuffer = await this.ctx.decodeAudioData(fileData);
     this.stemBuffers.set(stem, decodedBuffer);
+    this.hasDedicatedStems = true;
     if (decodedBuffer.duration > this.duration) {
       this.duration = decodedBuffer.duration;
     }
@@ -322,8 +235,8 @@ class StemAudioEngine {
     this.stop();
     const decodedBuffer = await this.ctx.decodeAudioData(fileData);
     this.duration = decodedBuffer.duration;
-    // Load as default full track into other stem and clear pause offset
-    this.stemBuffers.set('other', decodedBuffer);
+    this.fullTrackBuffer = decodedBuffer;
+    this.hasDedicatedStems = false;
     this.pauseOffset = 0;
     if (this.onTimeUpdateCallback) {
       this.onTimeUpdateCallback(0);
@@ -350,7 +263,14 @@ class StemAudioEngine {
   }
 
   private stopAllSources() {
-    this.stemSources.forEach(source => {
+    if (this.fullTrackSource) {
+      try {
+        this.fullTrackSource.stop();
+        this.fullTrackSource.disconnect();
+      } catch {}
+      this.fullTrackSource = null;
+    }
+    this.stemSources.forEach((source) => {
       try {
         source.stop();
         source.disconnect();
