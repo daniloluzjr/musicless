@@ -52,18 +52,29 @@ def run_demucs_separation(audio_path: Path, track_id: str):
         return
     separating_tracks.add(track_id)
     try:
-        print(f"[AI Demucs] Starting 6-stem separation for {track_id} ({audio_path})...")
+        # Convert any format (mp4, webm, mp3, m4a) to a clean 44.1kHz stereo WAV
+        # This allows Demucs' sphn to decode it natively without requiring ffprobe
+        wav_input = UPLOAD_DIR / f"{track_id}.wav"
+        if not wav_input.exists() or wav_input.stat().st_size == 0:
+            print(f"[AI Demucs] Converting {audio_path.name} to 44.1kHz stereo WAV...")
+            subprocess.run([
+                "ffmpeg", "-y", "-i", str(audio_path),
+                "-ar", "44100", "-ac", "2",
+                str(wav_input)
+            ], check=True, capture_output=True)
+
+        print(f"[AI Demucs] Starting 6-stem separation for {track_id} ({wav_input.name})...")
         cmd = [
             sys.executable, "-m", "demucs",
             "-n", "htdemucs_6s",
             "-o", str(OUTPUT_DIR),
-            str(audio_path)
+            str(wav_input)
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
             print(f"[AI Demucs] Successfully finished separation for {track_id}")
             target_folder = OUTPUT_DIR / "htdemucs_6s" / track_id
-            src_folder = OUTPUT_DIR / "htdemucs_6s" / audio_path.stem
+            src_folder = OUTPUT_DIR / "htdemucs_6s" / wav_input.stem
             if src_folder.exists() and not target_folder.exists():
                 shutil.copytree(src_folder, target_folder)
 

@@ -257,14 +257,27 @@ class StemAudioEngine {
     return this.duration;
   }
 
+  public reset(): void {
+    this.stop();
+    this.fullTrackBuffer = null;
+    this.stemBuffers.clear();
+    this.hasDedicatedStems = false;
+    this.duration = 0;
+    this.pauseOffset = 0;
+    if (this.onTimeUpdateCallback) {
+      this.onTimeUpdateCallback(0);
+    }
+  }
+
   public async loadFullTrack(fileData: ArrayBuffer): Promise<number> {
     this.initContext();
     if (!this.ctx) return 0;
     this.stop();
+    this.stemBuffers.clear();
+    this.hasDedicatedStems = false;
     const decodedBuffer = await this.ctx.decodeAudioData(fileData);
     this.duration = decodedBuffer.duration;
     this.fullTrackBuffer = decodedBuffer;
-    this.hasDedicatedStems = false;
     this.pauseOffset = 0;
     if (this.onTimeUpdateCallback) {
       this.onTimeUpdateCallback(0);

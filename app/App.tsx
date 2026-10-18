@@ -174,7 +174,7 @@ export default function App() {
   };
 
   const handleChangeSong = () => {
-    audioEngine.stop();
+    audioEngine.reset();
     setIsPlaying(false);
     setIsSongLoaded(false);
     setSelectedFile(null);
@@ -184,6 +184,11 @@ export default function App() {
     setCurrentTime(0);
     setUrlStatus('idle');
     setUrlStatusMessage('');
+    setUrlInput('');
+    setIsProcessingUrl(false);
+    setIsProcessingFile(false);
+    setActivePreset('all');
+    setTracks(INITIAL_TRACKS);
   };
 
   const pollForSeparatedStems = (trackId: string, songName: string) => {
