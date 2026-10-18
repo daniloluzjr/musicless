@@ -31,6 +31,8 @@ import {
   Star,
   CheckCircle2,
   Trash2,
+  Piano,
+  Wind,
 } from 'lucide-react-native';
 import { StemTrack, StemType } from './src/types';
 import { audioEngine } from './src/audio/StemAudioEngine';
@@ -40,7 +42,7 @@ const INITIAL_TRACKS: StemTrack[] = [
     id: 'vocals',
     name: 'Vocals',
     subtitle: 'Lead & Backing Vocals (Karaoke)',
-    color: '#38bdf8', // Cyan / Light Blue
+    color: '#38bdf8', // Cyan
     iconName: 'Mic',
     volume: 0.85,
     isMuted: false,
@@ -67,9 +69,29 @@ const INITIAL_TRACKS: StemTrack[] = [
     isSolo: false,
   },
   {
+    id: 'piano',
+    name: 'Keyboards & Piano',
+    subtitle: 'Piano, Organ, Synth Keys (Teclado)',
+    color: '#f43f5e', // Rose
+    iconName: 'Piano',
+    volume: 0.85,
+    isMuted: false,
+    isSolo: false,
+  },
+  {
+    id: 'brass',
+    name: 'Brass & Horns',
+    subtitle: 'Saxophone, Trumpet, Winds (Sax / Corneta)',
+    color: '#eab308', // Gold
+    iconName: 'Wind',
+    volume: 0.85,
+    isMuted: false,
+    isSolo: false,
+  },
+  {
     id: 'other',
     name: 'Guitar & Other',
-    subtitle: 'Guitars, Keyboards & Synths',
+    subtitle: 'Acoustic & Electric Guitars, FX',
     color: '#34d399', // Emerald
     iconName: 'Music',
     volume: 0.8,
@@ -89,6 +111,8 @@ export default function App() {
     vocals: 0,
     drums: 0,
     bass: 0,
+    piano: 0,
+    brass: 0,
     other: 0,
   });
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -259,6 +283,8 @@ export default function App() {
           vocals: audioEngine.getStemLevel('vocals'),
           drums: audioEngine.getStemLevel('drums'),
           bass: audioEngine.getStemLevel('bass'),
+          piano: audioEngine.getStemLevel('piano'),
+          brass: audioEngine.getStemLevel('brass'),
           other: audioEngine.getStemLevel('other'),
         });
       }
@@ -317,7 +343,7 @@ export default function App() {
     setActivePreset('custom');
   };
 
-  const applyPreset = (preset: 'all' | 'karaoke' | 'drums' | 'bass' | 'guitar') => {
+  const applyPreset = (preset: 'all' | 'karaoke' | 'drums' | 'bass' | 'piano' | 'brass' | 'guitar') => {
     setActivePreset(preset);
     let updated = tracks.map((t) => ({ ...t, isMuted: false, isSolo: false }));
 
@@ -327,6 +353,10 @@ export default function App() {
       updated = updated.map((t) => (t.id === 'drums' ? { ...t, isMuted: true } : t));
     } else if (preset === 'bass') {
       updated = updated.map((t) => (t.id === 'bass' ? { ...t, isMuted: true } : t));
+    } else if (preset === 'piano') {
+      updated = updated.map((t) => (t.id === 'piano' ? { ...t, isMuted: true } : t));
+    } else if (preset === 'brass') {
+      updated = updated.map((t) => (t.id === 'brass' ? { ...t, isMuted: true } : t));
     } else if (preset === 'guitar') {
       updated = updated.map((t) => (t.id === 'other' ? { ...t, isMuted: true } : t));
     }
@@ -355,6 +385,10 @@ export default function App() {
         return <Disc size={size} color={color} />;
       case 'bass':
         return <Activity size={size} color={color} />;
+      case 'piano':
+        return <Piano size={size} color={color} />;
+      case 'brass':
+        return <Wind size={size} color={color} />;
       case 'other':
         return <Music size={size} color={color} />;
     }
@@ -672,6 +706,26 @@ export default function App() {
                 <Activity size={16} color={activePreset === 'bass' ? '#fff' : '#c084fc'} />
                 <Text style={[styles.presetText, activePreset === 'bass' && styles.presetTextActive]}>
                   Bass
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.presetButton, activePreset === 'piano' && styles.presetButtonActive]}
+                onPress={() => applyPreset('piano')}
+              >
+                <Piano size={16} color={activePreset === 'piano' ? '#fff' : '#f43f5e'} />
+                <Text style={[styles.presetText, activePreset === 'piano' && styles.presetTextActive]}>
+                  Keys / Piano
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.presetButton, activePreset === 'brass' && styles.presetButtonActive]}
+                onPress={() => applyPreset('brass')}
+              >
+                <Wind size={16} color={activePreset === 'brass' ? '#fff' : '#eab308'} />
+                <Text style={[styles.presetText, activePreset === 'brass' && styles.presetTextActive]}>
+                  Brass / Sax
                 </Text>
               </TouchableOpacity>
 

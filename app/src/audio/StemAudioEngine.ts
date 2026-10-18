@@ -30,7 +30,7 @@ class StemAudioEngine {
     this.masterGain = this.ctx.createGain();
     this.masterGain.connect(this.ctx.destination);
 
-    const stemTypes: StemType[] = ['vocals', 'drums', 'bass', 'other'];
+    const stemTypes: StemType[] = ['vocals', 'drums', 'bass', 'piano', 'brass', 'other'];
     stemTypes.forEach(stem => {
       if (!this.ctx || !this.masterGain) return;
       const gain = this.ctx.createGain();
@@ -213,7 +213,7 @@ class StemAudioEngine {
 
     this.startTime = this.ctx.currentTime - (this.pauseOffset / this.playbackRate);
 
-    const stemTypes: StemType[] = ['vocals', 'drums', 'bass', 'other'];
+    const stemTypes: StemType[] = ['vocals', 'drums', 'bass', 'piano', 'brass', 'other'];
     stemTypes.forEach(stem => {
       const buffer = this.stemBuffers.get(stem);
       const gainNode = this.stemGainNodes.get(stem);

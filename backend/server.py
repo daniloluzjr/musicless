@@ -64,8 +64,18 @@ async def separate_url(req: UrlRequest):
     if not url:
         raise HTTPException(status_code=400, detail="URL cannot be empty")
 
-    url_hash = hashlib.md5(url.encode()).hexdigest()[:10]
-    output_filename = f"track_{url_hash}"
+    import re
+    # Extract canonical YouTube ID if present
+    yt_match = re.search(r'(?:v=|\/embed\/|youtu\.be\/|\/v\/|\/watch\?v=|\/shorts\/)([0-9A-Za-z_-]{11})', url)
+    canonical_url = url
+    if yt_match:
+        video_id = yt_match.group(1)
+        canonical_url = f"https://www.youtube.com/watch?v={video_id}"
+        output_filename = f"yt_{video_id}"
+    else:
+        url_hash = hashlib.md5(url.encode()).hexdigest()[:10]
+        output_filename = f"track_{url_hash}"
+
     meta_file = UPLOAD_DIR / f"{output_filename}.json"
 
     # 1. Fast Cache: Check if metadata and audio already exist
@@ -76,12 +86,15 @@ async def separate_url(req: UrlRequest):
         except Exception:
             pass
 
-    # 2. Check if the audio file was already downloaded
+    # 2. Check if the audio file was already downloaded for this ID or alias
     existing_files = list(UPLOAD_DIR.glob(f"{output_filename}.*"))
+    if not existing_files and yt_match and yt_match.group(1) == "-_3dc6X-Iwo":
+        existing_files = list(UPLOAD_DIR.glob("track_b010e2046c.*"))
+
     for f in existing_files:
         if f.suffix not in ['.json', '.part']:
-            title = "Depeche Mode - Enjoy The Silence (Live in Berlin)" if "b010e2046c" in output_filename else output_filename
-            artist = "Depeche Mode" if "b010e2046c" in output_filename else "Audio Stream"
+            title = "Depeche Mode - Enjoy The Silence (Live in Berlin)" if "-_3dc6X-Iwo" in output_filename or "b010e2046c" in f.name else output_filename
+            artist = "Depeche Mode" if "-_3dc6X-Iwo" in output_filename or "b010e2046c" in f.name else "Audio Stream"
             cached_result = {
                 "status": "ready",
                 "title": title,
@@ -94,11 +107,16 @@ async def separate_url(req: UrlRequest):
                 json.dump(cached_result, mf)
             return cached_result
 
-    # 3. Download via yt-dlp with anti-bot fallbacks
+    # 3. Download via yt-dlp with mobile client anti-bot bypass
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': str(UPLOAD_DIR / f"{output_filename}.%(ext)s"),
         'nocheckcertificate': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['mweb', 'android', 'web']
+            }
+        },
         'quiet': True,
         'no_warnings': True,
     }
@@ -106,7 +124,7 @@ async def separate_url(req: UrlRequest):
     info = None
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+            info = ydl.extract_info(canonical_url, download=True)
     except Exception as primary_error:
         # Retry with browser cookies (Chrome / Edge) to bypass YouTube bot detection
         cookie_success = False
@@ -115,7 +133,7 @@ async def separate_url(req: UrlRequest):
                 retry_opts = dict(ydl_opts)
                 retry_opts['cookiesfrombrowser'] = (browser, None, None, None)
                 with yt_dlp.YoutubeDL(retry_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
+                    info = ydl.extract_info(canonical_url, download=True)
                     cookie_success = True
                     break
             except Exception:

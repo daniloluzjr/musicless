@@ -1,4 +1,4 @@
-export type StemType = 'vocals' | 'drums' | 'bass' | 'other';
+export type StemType = 'vocals' | 'drums' | 'bass' | 'piano' | 'brass' | 'other';
 
 export interface StemTrack {
   id: StemType;
