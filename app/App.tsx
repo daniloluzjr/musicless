@@ -250,6 +250,7 @@ export default function App() {
       setSongSubtitle(`${data.artist} • YouTube Stream`);
 
       if (data.stems) {
+        setSongSubtitle(`${data.artist} • Demucs v4 AI Studio Stems (6 Tracks Isolated)`);
         setUrlStatusMessage(`Loading 6 isolated studio stems (Vocals, Drums, Bass, Piano, Brass, Guitar)...`);
         const stemBuffers: Partial<Record<StemType, ArrayBuffer>> = {};
         await Promise.all(
