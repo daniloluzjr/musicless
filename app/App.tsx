@@ -92,9 +92,11 @@ export default function App() {
     other: 0,
   });
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [importTab, setImportTab] = useState<'file' | 'url'>('file');
+  const [importTab, setImportTab] = useState<'file' | 'url'>('url');
   const [urlInput, setUrlInput] = useState('');
   const [isProcessingUrl, setIsProcessingUrl] = useState(false);
+  const [urlStatus, setUrlStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [urlStatusMessage, setUrlStatusMessage] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<{
     name: string;
     size: string;
@@ -184,24 +186,59 @@ export default function App() {
     }
   };
 
-  const handleProcessUrl = () => {
-    if (!urlInput.trim()) {
-      Alert.alert('Missing URL', 'Please paste a valid YouTube, Spotify, or audio link.');
+  const handleProcessUrl = async () => {
+    const trimmedUrl = urlInput.trim();
+    if (!trimmedUrl) {
+      setUrlStatus('error');
+      setUrlStatusMessage('Please paste a valid YouTube, YouTube Music, or Spotify link.');
       return;
     }
 
-    const isYoutube = urlInput.includes('youtube.com') || urlInput.includes('youtu.be');
-    const isSpotify = urlInput.includes('spotify.com');
-
+    setUrlStatus('loading');
+    setUrlStatusMessage('Connecting to backend & extracting audio with yt-dlp...');
     setIsProcessingUrl(true);
 
-    setTimeout(() => {
-      setIsProcessingUrl(false);
-      Alert.alert(
-        'Processing Initiated',
-        `Link detected (${isYoutube ? 'YouTube' : isSpotify ? 'Spotify' : 'Web Audio'}).\n\nThe backend server will extract the audio track via yt-dlp/spotdl and separate it into 4 stems with Demucs v4!`
+    try {
+      const response = await fetch('http://localhost:8000/separate-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: trimmedUrl }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to process link');
+      }
+
+      const data = await response.json();
+      setUrlStatusMessage(`Stream ready: "${data.title}". Decoding into player...`);
+
+      // Set song metadata in the player
+      setSongTitle(data.title);
+      setSongSubtitle(`${data.artist} • YouTube Stream`);
+
+      // Fetch and decode the audio buffer directly into the Web Audio API engine
+      const audioResponse = await fetch(data.audio_url);
+      const audioBuffer = await audioResponse.arrayBuffer();
+      const trackDuration = await audioEngine.loadFullTrack(audioBuffer);
+
+      setDuration(trackDuration || data.duration);
+      setCurrentTime(0);
+      setIsPlaying(false);
+
+      setUrlStatus('success');
+      setUrlStatusMessage(`Ready! Loaded "${data.title}". Press Play above to listen and practice!`);
+    } catch (err: any) {
+      console.error('URL extraction error:', err);
+      setUrlStatus('error');
+      setUrlStatusMessage(
+        err.message || 'Could not connect to backend. Make sure the server is running on port 8000.'
       );
-    }, 1200);
+    } finally {
+      setIsProcessingUrl(false);
+    }
   };
 
   // Sync with audio engine
@@ -708,6 +745,34 @@ export default function App() {
                   {isProcessingUrl ? 'Extracting Audio & Stems...' : 'Extract & Separate Stems'}
                 </Text>
               </TouchableOpacity>
+
+              {urlStatus !== 'idle' && (
+                <View
+                  style={[
+                    styles.urlStatusCard,
+                    urlStatus === 'loading' && styles.urlStatusCardLoading,
+                    urlStatus === 'success' && styles.urlStatusCardSuccess,
+                    urlStatus === 'error' && styles.urlStatusCardError,
+                  ]}
+                >
+                  <View style={styles.urlStatusIconRow}>
+                    {urlStatus === 'loading' && <RotateCcw size={16} color="#38bdf8" />}
+                    {urlStatus === 'success' && <CheckCircle2 size={16} color="#22c55e" />}
+                    {urlStatus === 'error' && <Info size={16} color="#ef4444" />}
+                    <Text
+                      style={[
+                        styles.urlStatusText,
+                        urlStatus === 'loading' && { color: '#38bdf8' },
+                        urlStatus === 'success' && { color: '#22c55e' },
+                        urlStatus === 'error' && { color: '#ef4444' },
+                      ]}
+                    >
+                      {urlStatusMessage}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
               <Text style={styles.uploadCardDesc}>
                 Audio will be fetched via <Text style={styles.bold}>yt-dlp</Text> and split into 4 stems using <Text style={styles.bold}>Demucs v4</Text>.
               </Text>
@@ -1337,5 +1402,36 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 13,
     fontWeight: '600',
+  },
+  urlStatusCard: {
+    width: '100%',
+    maxWidth: 600,
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1,
+  },
+  urlStatusCardLoading: {
+    backgroundColor: '#38bdf815',
+    borderColor: '#38bdf866',
+  },
+  urlStatusCardSuccess: {
+    backgroundColor: '#22c55e15',
+    borderColor: '#22c55e66',
+  },
+  urlStatusCardError: {
+    backgroundColor: '#ef444415',
+    borderColor: '#ef444466',
+  },
+  urlStatusIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  urlStatusText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 18,
   },
 });
