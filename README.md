@@ -1,6 +1,10 @@
 # 🎵 MusicLess — Free & Open-Source AI Stem Separation & Practice Mixer
 
 <p align="center">
+  <a href="https://musicless-app.vercel.app"><img src="https://img.shields.io/badge/Live%20Demo-musicless--app.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo on Vercel" /></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/daniloluzjr/musicless"><img src="https://img.shields.io/github/stars/daniloluzjr/musicless?style=social" alt="GitHub Stars" /></a>
   <a href="https://github.com/daniloluzjr/musicless"><img src="https://img.shields.io/github/forks/daniloluzjr/musicless?style=social" alt="GitHub Forks" /></a>
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License MIT" />
@@ -10,7 +14,16 @@
 </p>
 
 > **The 100% Free & Open-Source Alternative to Moises.ai.**  
-> Separate any track into **6 isolated studio stems** (Vocals, Drums, Bass, Piano, Brass/Sax, and Guitar) via direct file upload or YouTube/Spotify link with **zero bleed**!
+> Separate any track into **6 isolated studio stems** (Vocals, Drums, Bass, Piano, Brass/Sax, and Guitar) via direct file upload or YouTube/Spotify link with **zero bleed**!  
+> 
+> 🌐 **Live Web App:** [https://musicless-app.vercel.app](https://musicless-app.vercel.app)
+
+---
+
+## 🌐 Live Web Demo
+
+You can try the web player right now in your browser:  
+👉 **[musicless-app.vercel.app](https://musicless-app.vercel.app)**
 
 ---
 
