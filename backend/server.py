@@ -3,6 +3,8 @@ import shutil
 import subprocess
 import hashlib
 import json
+import threading
+import sys
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +12,15 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import yt_dlp
+
+# Ensure ffmpeg binary is in PATH for Demucs & Torchaudio
+try:
+    import imageio_ffmpeg
+    ffmpeg_dir = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
+    if ffmpeg_dir not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
+except Exception:
+    pass
 
 app = FastAPI(
     title="MusicLess AI Stem Separation API",
@@ -33,31 +44,69 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 app.mount("/separated", StaticFiles(directory=str(OUTPUT_DIR)), name="separated")
 app.mount("/audio", StaticFiles(directory=str(UPLOAD_DIR)), name="audio")
 
+separating_tracks = set()
+
+def run_demucs_separation(audio_path: Path, track_id: str):
+    """Runs Meta Demucs v4 6-stem AI model in the background."""
+    if track_id in separating_tracks:
+        return
+    separating_tracks.add(track_id)
+    try:
+        print(f"[AI Demucs] Starting 6-stem separation for {track_id} ({audio_path})...")
+        cmd = [
+            sys.executable, "-m", "demucs",
+            "-n", "htdemucs_6s",
+            "-o", str(OUTPUT_DIR),
+            str(audio_path)
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"[AI Demucs] Successfully finished separation for {track_id}")
+            # If Demucs placed output in audio_path.stem folder and track_id differs, link/copy
+            target_folder = OUTPUT_DIR / "htdemucs_6s" / track_id
+            src_folder = OUTPUT_DIR / "htdemucs_6s" / audio_path.stem
+            if src_folder.exists() and not target_folder.exists():
+                shutil.copytree(src_folder, target_folder)
+        else:
+            print(f"[AI Demucs] Error separating {track_id}: {result.stderr}")
+    except Exception as e:
+        print(f"[AI Demucs] Exception during separation of {track_id}: {e}")
+    finally:
+        separating_tracks.discard(track_id)
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "MusicLess AI Separator"}
 
 @app.post("/separate")
 async def separate_audio(file: UploadFile = File(...)):
-    track_id = Path(file.filename).stem.replace(" ", "_")
-    input_path = UPLOAD_DIR / f"{track_id}_{file.filename}"
+    raw_stem = Path(file.filename).stem.replace(" ", "_")
+    ext = Path(file.filename).suffix or ".wav"
+    track_id = f"upload_{raw_stem}"
+    input_path = UPLOAD_DIR / f"{track_id}{ext}"
 
     with open(input_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # Trigger background Demucs AI separation
+    threading.Thread(target=run_demucs_separation, args=(input_path, track_id), daemon=True).start()
+
     return {
         "status": "ready",
         "track_id": track_id,
-        "audio_url": f"/audio/{track_id}_{file.filename}",
+        "audio_url": f"http://localhost:8000/audio/{input_path.name}",
+        "is_separated": False,
+        "is_processing": True
     }
 
 def find_separated_stems(track_id: str):
     candidates = [
         OUTPUT_DIR / "htdemucs_6s" / track_id,
-        OUTPUT_DIR / "htdemucs_6s" / "track_b010e2046c",
         OUTPUT_DIR / "htdemucs" / track_id,
-        OUTPUT_DIR / "htdemucs" / "track_b010e2046c",
     ]
+    if "-_3dc6X-Iwo" in track_id or "b010e2046c" in track_id:
+        candidates.append(OUTPUT_DIR / "htdemucs_6s" / "track_b010e2046c")
+        candidates.append(OUTPUT_DIR / "htdemucs" / "track_b010e2046c")
     for stem_dir in candidates:
         if stem_dir.exists():
             vocals = stem_dir / "vocals.wav"
@@ -85,8 +134,8 @@ def find_separated_stems(track_id: str):
 def get_track_stems(track_id: str):
     stems = find_separated_stems(track_id)
     if stems:
-        return {"is_separated": True, "stems": stems}
-    return {"is_separated": False}
+        return {"is_separated": True, "stems": stems, "is_processing": False}
+    return {"is_separated": False, "is_processing": track_id in separating_tracks}
 
 class UrlRequest(BaseModel):
     url: str
@@ -137,6 +186,8 @@ async def separate_url(req: UrlRequest):
         if f.suffix not in ['.json', '.part']:
             title = "Depeche Mode - Enjoy The Silence (Live in Berlin)" if "-_3dc6X-Iwo" in output_filename or "b010e2046c" in f.name else output_filename
             artist = "Depeche Mode" if "-_3dc6X-Iwo" in output_filename or "b010e2046c" in f.name else "Audio Stream"
+            if stems is None:
+                threading.Thread(target=run_demucs_separation, args=(f, output_filename), daemon=True).start()
             cached_result = {
                 "status": "ready",
                 "title": title,
@@ -193,6 +244,10 @@ async def separate_url(req: UrlRequest):
     artist = info.get('artist') or info.get('uploader') or 'Unknown Artist'
     ext = info.get('ext', 'webm')
     duration = info.get('duration', 0)
+    audio_path = UPLOAD_DIR / f"{output_filename}.{ext}"
+
+    # Auto-trigger Demucs 6-stem AI separation in background
+    threading.Thread(target=run_demucs_separation, args=(audio_path, output_filename), daemon=True).start()
 
     result = {
         "status": "ready",
@@ -201,6 +256,8 @@ async def separate_url(req: UrlRequest):
         "duration": duration,
         "audio_url": f"http://localhost:8000/audio/{output_filename}.{ext}",
         "track_id": output_filename,
+        "is_separated": False,
+        "stems": None,
     }
 
     with open(meta_file, "w", encoding="utf-8") as mf:

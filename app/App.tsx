@@ -186,6 +186,52 @@ export default function App() {
     setUrlStatusMessage('');
   };
 
+  const pollForSeparatedStems = (trackId: string, songName: string) => {
+    let attempts = 0;
+    const maxAttempts = 60; // 5 minutes polling
+    const interval = setInterval(async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(interval);
+        return;
+      }
+      try {
+        const res = await fetch(`http://localhost:8000/track-stems/${trackId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.is_separated && data.stems) {
+          clearInterval(interval);
+          setUrlStatusMessage(`Demucs AI completed! Loading 6 isolated studio stems...`);
+          const stemBuffers: Partial<Record<StemType, ArrayBuffer>> = {};
+          await Promise.all(
+            (['vocals', 'drums', 'bass', 'piano', 'brass', 'other'] as StemType[]).map(async (stemKey) => {
+              const stemUrl = data.stems[stemKey];
+              if (stemUrl) {
+                const sRes = await fetch(stemUrl);
+                stemBuffers[stemKey] = await sRes.arrayBuffer();
+              }
+            })
+          );
+          const wasPlaying = audioEngine.getIsPlaying();
+          const curTime = audioEngine.getCurrentTime();
+          const trackDuration = await audioEngine.loadAllStems(stemBuffers);
+          setDuration(trackDuration);
+          audioEngine.seek(curTime);
+          setCurrentTime(curTime);
+          if (wasPlaying) {
+            await audioEngine.play();
+            setIsPlaying(true);
+          }
+          setSongSubtitle((prev) => `${prev.split('•')[0].trim()} • Demucs v4 AI Studio Stems (6 Tracks Isolated)`);
+          setUrlStatus('success');
+          setUrlStatusMessage(`✨ Demucs v4 AI: 6 isolated studio tracks loaded for "${songName}"! Zero bleed.`);
+        }
+      } catch {
+        // silent retry
+      }
+    }, 5000);
+  };
+
   const handleSeparateUploadedFile = async () => {
     if (!selectedFile) return;
     setIsProcessingFile(true);
@@ -202,14 +248,19 @@ export default function App() {
       });
 
       if (response.ok) {
-        Alert.alert('Success', 'AI Stem Separation finished! 4 stems separated.');
+        const data = await response.json();
+        Alert.alert(
+          'AI Separation Started',
+          'Meta Demucs v4 is isolating 6 studio tracks in the background. They will automatically load once ready!'
+        );
+        pollForSeparatedStems(data.track_id, selectedFile.name);
       } else {
         throw new Error('Backend offline');
       }
     } catch {
       Alert.alert(
         'Track Loaded into Player',
-        `"${selectedFile.name}" is already loaded and ready to play in the mixer!\n\nTo run full AI 4-stem separation (Demucs v4), start the backend server:\ncd backend && python server.py`
+        `"${selectedFile.name}" is already loaded and ready to play in the mixer!\n\nTo run full AI 6-stem separation (Demucs v4), start the backend server:\ncd backend && python server.py`
       );
     } finally {
       setIsProcessingFile(false);
@@ -270,7 +321,7 @@ export default function App() {
         setUrlStatus('success');
         setUrlStatusMessage(`Ready! Loaded 6 isolated studio stems for "${data.title}". Zero bleed!`);
       } else {
-        // Fetch and decode full track into 6-stem crossover filter engine
+        // Fetch and decode full track into 6-stem crossover filter engine immediately
         const audioResponse = await fetch(data.audio_url);
         const audioBuffer = await audioResponse.arrayBuffer();
         const trackDuration = await audioEngine.loadFullTrack(audioBuffer);
@@ -281,7 +332,12 @@ export default function App() {
         setIsSongLoaded(true);
 
         setUrlStatus('success');
-        setUrlStatusMessage(`Ready! Loaded "${data.title}". Press Play to listen and practice!`);
+        setUrlStatusMessage(`Loaded "${data.title}". Isolating 6 studio stems in background with Demucs AI...`);
+
+        // Start background polling for AI isolated stems
+        if (data.track_id) {
+          pollForSeparatedStems(data.track_id, data.title);
+        }
       }
     } catch (err: any) {
       console.error('URL extraction error:', err);
