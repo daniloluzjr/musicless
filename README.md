@@ -1,84 +1,121 @@
-# 🎵 MusicLess — Open Source Stem Separation & Practice Mixer
+# 🎵 MusicLess — Free & Open-Source AI Stem Separation & Practice Mixer
 
-Um aplicativo **100% gratuito e open source** para prática musical, karaokê e estudo de instrumentos (guitarra, baixo, bateria, vocais).
+<p align="center">
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License MIT" />
+  <img src="https://img.shields.io/badge/Platform-Web%20%7C%20iOS%20%7C%20Android-informational" alt="Platforms" />
+  <img src="https://img.shields.io/badge/Framework-Expo%20%2F%20React%20Native-blueviolet" alt="Expo React Native" />
+  <img src="https://img.shields.io/badge/AI%20Model-Meta%20Demucs%20v4-success" alt="Demucs v4" />
+  <img src="https://img.shields.io/badge/Audio-Web%20Audio%20API-orange" alt="Web Audio" />
+</p>
 
-Inspirado nos conceitos de engenharia reversa do Moises.ai (`recon_3.md` e `features_2.csv`), o **MusicLess** foi arquitetado para permitir que qualquer músico isole ou silencie instrumentos de uma música sem custos de assinatura.
-
----
-
-## 🚀 Funcionalidades Principais
-
-- 🎤 **Modo Karaokê**: Silencie a voz principal e coros em 1 clique para cantar por cima.
-- 🥁 **Modo Drumless**: Silencie a bateria para praticar na bateria acústica ou eletrônica.
-- 🎸 **Modo Bassless / Guitarras**: Isole o baixo ou guitarras para aprender linhas e solos de ouvido.
-- 🎚️ **Mixer Multi-Pistas (4 Stems)**:
-  - Faders de volume independentes para **Vocais, Bateria, Baixo e Harmonia (Outros)**.
-  - Botões **MUTE** (silenciar) e **SOLO** (isolar).
-  - VU Meters animados com leitura de pico em tempo real.
-- ⚡ **Controle de Velocidade**: 0.75x, 1.0x, 1.25x sem alterar a afinação.
-- 📱 **Multiplataforma**: Código único em **React Native com Expo** funcionando na **Web**, **Android** e **iOS**.
+> **The 100% Free & Open-Source Alternative to Moises.ai.**
+> Mute vocals for karaoke, isolate drums or bass to jam along, change speed without pitch shift, and separate any track via file upload or YouTube/Spotify link!
 
 ---
 
-## 📂 Estrutura do Projeto
+## ⭐ Why MusicLess?
+
+Most commercial stem separation apps force musicians behind expensive subscriptions ($10–$30/month) or lock basic features like loop and speed control behind paywalls. 
+
+**MusicLess** is built from clean-room reverse engineering specifications to offer:
+- 🎤 **Karaoke Mode**: Mute lead & backing vocals with 1 click to sing over backing tracks.
+- 🥁 **Drumless Mode**: Silence drums completely to practice on acoustic or electronic kits.
+- 🎸 **Bassless & Guitar Isolation**: Isolate basslines or solos to learn songs by ear.
+- 🎚️ **4-Stem Synchronized Mixer**:
+  - Independent volume faders for **Vocals, Drums, Bass, and Other (Keys/Guitar)**.
+  - Tactile **MUTE** and **SOLO** buttons per channel.
+  - Real-time animated **VU Peak Meters**.
+- 🔗 **Smart Link Importer**: Paste **YouTube**, **Spotify**, or **SoundCloud** links directly (`yt-dlp` integration).
+- ⚡ **Speed & Pitch Controls**: Slow down tricky guitar solos (0.75x) without altering pitch.
+- 📱 **Universal Cross-Platform**: Run locally on Web, or compile to native Android and iOS via Expo.
+
+---
+
+## 📸 Interface Preview
 
 ```
-MusicLess app/
-├── app/                  # Frontend Multiplataforma (Expo / React Native / TypeScript)
+┌──────────────────────────────────────────────────────────┐
+│  MusicLess [OPEN SOURCE]        Stem Practice Player     │
+├──────────────────────────────────────────────────────────┤
+│  Quick Modes: [Karaoke] [Drums] [Bass] [Guitar] [All]    │
+│  Transport:   [◀◀]  [ ▶ PLAY ]  [Speed: 0.75x 1.0x 1.25x]│
+├──────────────────────────────────────────────────────────┤
+│  [🎤] Vocals           [MUTE] [SOLO]  ═══════════● 85%   │
+│  [🥁] Drums            [MUTE] [SOLO]  ════════════● 90%  │
+│  [⚡] Bass             [MUTE] [SOLO]  ═════════════● 95% │
+│  [🎸] Guitar & Other   [MUTE] [SOLO]  ══════════● 80%    │
+├──────────────────────────────────────────────────────────┤
+│  Import Hub: [Paste YouTube/Spotify Link] | [Upload MP3] │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📂 Project Architecture
+
+```
+MusicLess/
+├── app/                  # Frontend (React Native + Expo + Web Audio API)
 │   ├── src/
-│   │   ├── audio/        # StemAudioEngine (Web Audio API sincronizado)
-│   │   └── types.ts      # Tipagens dos Stems e Mixer
-│   ├── App.tsx           # Interface visual da Mesa de Mixagem
+│   │   ├── audio/        # StemAudioEngine.ts (Sample-accurate multi-stem sync)
+│   │   └── types.ts      # Stem & Player type contracts
+│   ├── App.tsx           # Mixer & Player Interface
 │   └── package.json
 │
-├── backend/              # Motor de Separação de IA (Python / FastAPI / Demucs v4)
-│   ├── server.py         # API de upload e separação em 4 stems
-│   ├── requirements.txt  # Dependências (PyTorch, Demucs, FastAPI)
-│   └── Dockerfile        # Container pronto para Docker ou Hugging Face Spaces
+├── backend/              # AI Separation Engine (Python / FastAPI)
+│   ├── server.py         # Demucs v4 + yt-dlp audio extractor API
+│   ├── requirements.txt  # PyTorch, Demucs, FastAPI, yt-dlp
+│   └── Dockerfile        # Docker container for local/cloud deployment
 │
-├── recon_3.md            # Engenharia reversa e especificação de produto (Moises)
-└── features_2.csv        # Matriz de 50 requisitos e prioridades
+├── recon_3.md            # Clean-room functional reverse-engineering analysis
+└── features_2.csv        # 50-item product roadmap & priorities
 ```
 
 ---
 
-## 🛠️ Como Executar
+## 🚀 Quickstart
 
-### 1. Rodar o App (Web / Mobile)
-
-Entre na pasta `app`:
+### 1. Run the Web/Mobile Player
 
 ```bash
 cd app
 npm run web
 ```
+- Open your browser at `http://localhost:8081`.
+- Press **Play** to test the real-time synthesized 4-channel funk backing track.
+- Try toggling **MUTE** on Vocals or **SOLO** on Bass.
 
-- Pressione **Play** para testar imediatamente o backing track interativo de 4 pistas gerado em tempo real pelo motor de áudio.
-- Para rodar no Android: `npm run android`
-- Para rodar no iOS: `npm run ios`
+To build mobile apps:
+- Android: `npm run android`
+- iOS: `npm run ios`
 
-### 2. Rodar o Backend de IA (Demucs v4)
+### 2. Run the AI Separation Backend (Optional for file/link processing)
 
-Se quiser separar suas próprias músicas utilizando a rede neural HTDemucs:
-
-#### Opção A: Via Docker (Mais fácil)
+#### Using Docker:
 ```bash
 cd backend
-docker build -t musicless-backend .
-docker run -p 8000:8000 musicless-backend
+docker build -t musicless-ai .
+docker run -p 8000:8000 musicless-ai
 ```
 
-#### Opção B: Direto no Python
+#### Directly with Python:
 ```bash
 cd backend
 pip install -r requirements.txt
 python server.py
 ```
-
-A API estará disponível em `http://localhost:8000/docs`.
+API Documentation will be live at `http://localhost:8000/docs`.
 
 ---
 
-## 📄 Licença
+## 🤝 Contributing
 
-Distribuído sob a licença **MIT** — livre para uso pessoal, educacional e comercial.
+Contributions are welcome! If you'd like to improve the audio engine, add chord recognition, or package on-device CoreML/TFLite models, please submit a Pull Request or open an Issue.
+
+If you find this project helpful, please consider giving it a **⭐ Star on GitHub**!
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. Free for personal, educational, and commercial use.
