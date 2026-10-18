@@ -32,8 +32,8 @@ import { audioEngine } from './src/audio/StemAudioEngine';
 const INITIAL_TRACKS: StemTrack[] = [
   {
     id: 'vocals',
-    name: 'Vocais',
-    subtitle: 'Voz Principal & Coros (Karaokê)',
+    name: 'Vocals',
+    subtitle: 'Lead & Backing Vocals (Karaoke)',
     color: '#38bdf8', // Cyan / Light Blue
     iconName: 'Mic',
     volume: 0.85,
@@ -42,8 +42,8 @@ const INITIAL_TRACKS: StemTrack[] = [
   },
   {
     id: 'drums',
-    name: 'Bateria',
-    subtitle: 'Bombo, Tarola, Pratos (Drumless)',
+    name: 'Drums',
+    subtitle: 'Kick, Snare, Cymbals (Drumless)',
     color: '#fb923c', // Orange
     iconName: 'Disc',
     volume: 0.9,
@@ -52,8 +52,8 @@ const INITIAL_TRACKS: StemTrack[] = [
   },
   {
     id: 'bass',
-    name: 'Baixo',
-    subtitle: 'Linha de Baixo & Sub (Bassless)',
+    name: 'Bass',
+    subtitle: 'Bassline & Sub (Bassless)',
     color: '#c084fc', // Purple
     iconName: 'Activity',
     volume: 0.95,
@@ -62,8 +62,8 @@ const INITIAL_TRACKS: StemTrack[] = [
   },
   {
     id: 'other',
-    name: 'Guitarra & Harmonia',
-    subtitle: 'Guitarras, Sintetizadores & Teclas',
+    name: 'Guitar & Other',
+    subtitle: 'Guitars, Keyboards & Synths',
     color: '#34d399', // Emerald
     iconName: 'Music',
     volume: 0.8,
@@ -212,7 +212,7 @@ export default function App() {
                 <Text style={styles.openSourceText}>OPEN SOURCE</Text>
               </View>
             </View>
-            <Text style={styles.subtitle}>Stem Separation & Prática Musical</Text>
+            <Text style={styles.subtitle}>Stem Separation & Practice Player</Text>
           </View>
         </View>
 
@@ -230,20 +230,20 @@ export default function App() {
           <View style={styles.infoCard}>
             <View style={styles.infoTitleRow}>
               <Sparkles size={18} color="#38bdf8" />
-              <Text style={styles.infoCardTitle}>Arquitetura 100% Free & Open Source</Text>
+              <Text style={styles.infoCardTitle}>100% Free & Open Source Architecture</Text>
             </View>
             <Text style={styles.infoText}>
-              • <Text style={styles.bold}>Como funciona agora:</Text> O player está rodando uma síntese de 4 faixas em tempo real na Web Audio API com sincronismo perfeito.{'\n'}
-              • <Text style={styles.bold}>Para separar suas músicas:</Text> Utilize o backend gratuito com o modelo <Text style={styles.bold}>Demucs v4</Text> (Meta) via Docker local ou conecte à API do Hugging Face.{'\n'}
-              • <Text style={styles.bold}>Multiplataforma:</Text> Código único React Native com Expo, compilável para Web, Android e iOS.
+              • <Text style={styles.bold}>How it works right now:</Text> The player is running real-time 4-stem synthesis on the Web Audio API with zero latency.{'\n'}
+              • <Text style={styles.bold}>To separate your songs:</Text> Connect to the free backend running <Text style={styles.bold}>Demucs v4</Text> (Meta AI) via local Docker or Hugging Face Spaces API.{'\n'}
+              • <Text style={styles.bold}>Cross-Platform:</Text> Single React Native codebase with Expo, compiling to Web, Android, and iOS.
             </Text>
           </View>
         )}
 
-        {/* PRESET PRACTICE MODES (AÇÕES RÁPIDAS) */}
+        {/* PRESET PRACTICE MODES */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Modos Rápidos de Prática</Text>
-          <Text style={styles.sectionHint}>Silencie seu instrumento em 1 clique</Text>
+          <Text style={styles.sectionTitle}>Quick Practice Modes</Text>
+          <Text style={styles.sectionHint}>Mute your instrument with a single click</Text>
         </View>
 
         <View style={styles.presetRow}>
@@ -253,7 +253,7 @@ export default function App() {
           >
             <Mic size={16} color={activePreset === 'karaoke' ? '#fff' : '#38bdf8'} />
             <Text style={[styles.presetText, activePreset === 'karaoke' && styles.presetTextActive]}>
-              Karaokê
+              Karaoke
             </Text>
           </TouchableOpacity>
 
@@ -263,7 +263,7 @@ export default function App() {
           >
             <Disc size={16} color={activePreset === 'drums' ? '#fff' : '#fb923c'} />
             <Text style={[styles.presetText, activePreset === 'drums' && styles.presetTextActive]}>
-              Bateria
+              Drums
             </Text>
           </TouchableOpacity>
 
@@ -273,7 +273,7 @@ export default function App() {
           >
             <Activity size={16} color={activePreset === 'bass' ? '#fff' : '#c084fc'} />
             <Text style={[styles.presetText, activePreset === 'bass' && styles.presetTextActive]}>
-              Baixo
+              Bass
             </Text>
           </TouchableOpacity>
 
@@ -283,7 +283,7 @@ export default function App() {
           >
             <Music size={16} color={activePreset === 'guitar' ? '#fff' : '#34d399'} />
             <Text style={[styles.presetText, activePreset === 'guitar' && styles.presetTextActive]}>
-              Guitarra
+              Guitar
             </Text>
           </TouchableOpacity>
 
@@ -293,7 +293,7 @@ export default function App() {
           >
             <Volume2 size={16} color={activePreset === 'all' ? '#fff' : '#94a3b8'} />
             <Text style={[styles.presetText, activePreset === 'all' && styles.presetTextActive]}>
-              Tudo
+              All
             </Text>
           </TouchableOpacity>
         </View>
@@ -303,7 +303,7 @@ export default function App() {
           <View style={styles.trackInfoRow}>
             <View>
               <Text style={styles.songTitle}>Funk Groove Demo (120 BPM)</Text>
-              <Text style={styles.artistName}>Faixa Multi-Pistas (4 Stems Demo)</Text>
+              <Text style={styles.artistName}>Multi-Track Stem Session (4 Channels)</Text>
             </View>
             <View style={styles.timeBadge}>
               <Text style={styles.timeText}>
@@ -379,15 +379,15 @@ export default function App() {
 
             <View style={styles.statusGroup}>
               <View style={[styles.statusDot, isPlaying && styles.statusDotActive]} />
-              <Text style={styles.statusText}>{isPlaying ? 'TOCANDO' : 'PAUSADO'}</Text>
+              <Text style={styles.statusText}>{isPlaying ? 'PLAYING' : 'PAUSED'}</Text>
             </View>
           </View>
         </View>
 
         {/* 4-STEMS MIXER SECTION */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Mesa de Mixagem Multi-Pistas (Mixer)</Text>
-          <Text style={styles.sectionHint}>Ajuste volumes, silencie (Mute) ou isole (Solo)</Text>
+          <Text style={styles.sectionTitle}>Multi-Track Stem Mixer</Text>
+          <Text style={styles.sectionHint}>Adjust volume faders, mute or solo any instrument</Text>
         </View>
 
         <View style={styles.channelsList}>
@@ -507,20 +507,20 @@ export default function App() {
         {/* UPLOAD / EXPANSION BANNER */}
         <View style={styles.uploadCard}>
           <UploadCloud size={28} color="#38bdf8" />
-          <Text style={styles.uploadCardTitle}>Separar Novo Áudio (MP3 / WAV)</Text>
+          <Text style={styles.uploadCardTitle}>Separate New Song (MP3 / WAV)</Text>
           <Text style={styles.uploadCardDesc}>
-            Para o modo Open Source sustentável: processe suas faixas via Demucs local ou adicione suas chaves gratuitas de API.
+            Sustainable open-source setup: split your full songs with Demucs AI locally or using free API endpoints.
           </Text>
           <TouchableOpacity
             style={styles.uploadActionBtn}
             onPress={() => {
               Alert.alert(
-                'Próxima Etapa',
-                'O próximo módulo conectará a fila de separação (Demucs / ONNX) para processar qualquer áudio carregado pelo usuário!'
+                'Next Step',
+                'The separation pipeline will connect Demucs / ONNX to process any uploaded song!'
               );
             }}
           >
-            <Text style={styles.uploadActionBtnText}>Importar Arquivo de Áudio</Text>
+            <Text style={styles.uploadActionBtnText}>Import Audio File</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
