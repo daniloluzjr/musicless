@@ -39,6 +39,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "build_pkg/MusicLess"
           Copy-Item "desktop_app.py" "build_pkg/MusicLess/"
           Copy-Item "run-musicless.bat" "build_pkg/MusicLess/"
+          Copy-Item "LEIA-ME.txt" "build_pkg/MusicLess/"
           Copy-Item "README.md" "build_pkg/MusicLess/"
           Copy-Item "LICENSE" "build_pkg/MusicLess/"
           Copy-Item -Recurse "backend" "build_pkg/MusicLess/"
