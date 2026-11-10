@@ -31,6 +31,17 @@ license: mit
 
 ---
 
+## 💻 Download Desktop App (Windows)
+
+To separate unlimited songs offline with zero server lag and 100% free:  
+👉 **[Download Latest Windows Release (.zip / portable)](https://github.com/daniloluzjr/musicless/releases)**
+
+1. Download and extract the latest release package.
+2. Double click **`run-musicless.bat`**.
+3. MusicLess opens directly in your browser with full offline AI compute powered by your machine!
+
+---
+
 ## 🌐 Live Web Demo
 
 You can try the web player right now in your browser:  

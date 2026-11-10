@@ -40,6 +40,8 @@ import {
   Heart,
   X,
   ExternalLink,
+  Download,
+  Monitor,
 } from 'lucide-react-native';
 import { StemTrack, StemType } from './src/types';
 import { audioEngine } from './src/audio/StemAudioEngine';
@@ -399,7 +401,7 @@ export default function App() {
       const msg = err.message || '';
       if (!msg || msg.includes('fetch') || msg.includes('Failed') || msg.includes('NetworkError')) {
         setUrlStatusMessage(
-          'Could not connect to AI backend server. Make sure the local server is running on port 8000 or the cloud API is online.'
+          'Could not connect to AI backend. Full 6-stem separation requires local AI compute. Please download the free Desktop App above or run "py server.py" on your machine.'
         );
       } else {
         setUrlStatusMessage(
@@ -597,6 +599,14 @@ export default function App() {
         </View>
 
         <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            style={styles.downloadDesktopBtn}
+            onPress={() => Linking.openURL('https://github.com/daniloluzjr/musicless/releases')}
+          >
+            <Download size={14} color="#38bdf8" />
+            <Text style={styles.downloadDesktopText}>Download Desktop</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.starGithubBtn}
             onPress={() => Linking.openURL('https://github.com/daniloluzjr/musicless')}
@@ -865,6 +875,29 @@ export default function App() {
                   </TouchableOpacity>
                 </View>
               )}
+              {/* NOTICE BANNER: WHY ONLINE SEPARATION REQUIRES DESKTOP / LOCAL BACKEND */}
+              <View style={styles.engineNoticeBanner}>
+                <View style={styles.engineNoticeHeader}>
+                  <Info size={14} color="#38bdf8" />
+                  <Text style={styles.engineNoticeTitle}>Why is online separation offline?</Text>
+                </View>
+                <Text style={styles.engineNoticeBody}>
+                  High-fidelity 6-stem AI separation (UVR5 MDX-Net + Meta Demucs v4) requires over 4 GB of RAM and GPU compute not supported on free static web hosting. To separate songs with zero limits:
+                </Text>
+                <View style={styles.engineNoticeActions}>
+                  <TouchableOpacity
+                    style={styles.downloadAppChip}
+                    onPress={() => Linking.openURL('https://github.com/daniloluzjr/musicless/releases')}
+                  >
+                    <Download size={13} color="#0f172a" />
+                    <Text style={styles.downloadAppChipText}>Download Free Desktop App (Windows)</Text>
+                    <ExternalLink size={11} color="#0f172a" style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                  <Text style={styles.engineNoticeOrText}>
+                    or run <Text style={styles.engineNoticeCode}>py server.py</Text> locally to power this web studio.
+                  </Text>
+                </View>
+              </View>
             </View>
           ) : (
             /* NOW PLAYING TRACK INFO */
@@ -1250,6 +1283,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  downloadDesktopBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#0284c722',
+    borderWidth: 1,
+    borderColor: '#38bdf888',
+    paddingHorizontal: 12,
+    height: 34,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  downloadDesktopText: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '700',
   },
   starGithubBtn: {
     flexDirection: 'row',
@@ -2124,5 +2174,58 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  engineNoticeBanner: {
+    marginTop: 14,
+    backgroundColor: '#0f172a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    padding: 12,
+  },
+  engineNoticeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  engineNoticeTitle: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  engineNoticeBody: {
+    color: '#94a3b8',
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  engineNoticeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  downloadAppChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#38bdf8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  downloadAppChipText: {
+    color: '#0f172a',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  engineNoticeOrText: {
+    color: '#64748b',
+    fontSize: 11,
+  },
+  engineNoticeCode: {
+    color: '#cbd5e1',
+    fontWeight: '700',
   },
 });
