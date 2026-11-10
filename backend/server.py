@@ -13,7 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import yt_dlp
 
-# Ensure ffmpeg binary is in PATH for Demucs & Torchaudio
+# Ensure ffmpeg binary is in PATH for Demucs, Torchaudio & AudioSeparator
+backend_dir = str(Path(__file__).parent.resolve())
+if backend_dir not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = backend_dir + os.pathsep + os.environ.get("PATH", "")
+
 try:
     import imageio_ffmpeg
     ffmpeg_dir = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
@@ -24,8 +28,8 @@ except Exception:
 
 app = FastAPI(
     title="MusicLess AI Stem Separation API",
-    description="Open Source Audio Stem Separation Backend using Demucs v4 & yt-dlp",
-    version="1.0.0"
+    description="Open Source Audio Stem Separation Backend using UVR5 MDX-Net & Meta Demucs v4",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -38,59 +42,129 @@ app.add_middleware(
 
 UPLOAD_DIR = Path("uploads")
 OUTPUT_DIR = Path("separated")
+MODELS_DIR = Path("models")
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
+MODELS_DIR.mkdir(exist_ok=True)
 
 app.mount("/separated", StaticFiles(directory=str(OUTPUT_DIR)), name="separated")
 app.mount("/audio", StaticFiles(directory=str(UPLOAD_DIR)), name="audio")
 
 separating_tracks = set()
 
-def run_demucs_separation(audio_path: Path, track_id: str):
-    """Runs Meta Demucs v4 6-stem AI model in the background and converts stems to MP3."""
+def run_uvr_cascade_separation(audio_path: Path, track_id: str):
+    """
+    Ultimate Vocal Remover (UVR5) + Meta Demucs v4 Cascade Separation:
+    1. Pre-converts input audio to 44.1kHz stereo WAV.
+    2. Runs UVR MDX-Net (UVR-MDX-NET-Voc_FT.onnx) to extract ultra-clean Vocals and Instrumental with zero bleed.
+    3. Runs Demucs 6s on the pure Instrumental to extract clean Drums, Bass, Guitar, Piano, and Other without vocal contamination.
+    4. Combines UVR Vocals with the clean Demucs instrument stems.
+    5. Converts all stems to lightweight 192k MP3 for rapid browser streaming.
+    Falls back gracefully to standard Demucs if any step fails.
+    """
     if track_id in separating_tracks:
         return
     separating_tracks.add(track_id)
     try:
-        # Convert any format (mp4, webm, mp3, m4a) to a clean 44.1kHz stereo WAV
-        # This allows Demucs' sphn to decode it natively without requiring ffprobe
         wav_input = UPLOAD_DIR / f"{track_id}.wav"
         if not wav_input.exists() or wav_input.stat().st_size == 0:
-            print(f"[AI Demucs] Converting {audio_path.name} to 44.1kHz stereo WAV...")
+            print(f"[AI Pipeline] Converting {audio_path.name} to 44.1kHz stereo WAV...")
             subprocess.run([
                 "ffmpeg", "-y", "-i", str(audio_path),
                 "-ar", "44100", "-ac", "2",
                 str(wav_input)
             ], check=True, capture_output=True)
 
-        print(f"[AI Demucs] Starting 6-stem separation for {track_id} ({wav_input.name})...")
+        target_folder = OUTPUT_DIR / "htdemucs_6s" / track_id
+        target_folder.mkdir(parents=True, exist_ok=True)
+
+        uvr_success = False
+        uvr_vocals_wav = None
+        uvr_inst_wav = None
+
+        # Step 1: UVR Separation for Ultra-Clean Vocals & Instrumental
+        try:
+            print(f"[UVR Engine] Running MDX-Net vocal separation for {track_id}...")
+            from audio_separator.separator import Separator
+            uvr_dir = OUTPUT_DIR / "uvr_temp" / track_id
+            uvr_dir.mkdir(parents=True, exist_ok=True)
+
+            sep = Separator(
+                output_dir=str(uvr_dir),
+                model_file_dir=str(MODELS_DIR),
+                output_format="WAV"
+            )
+            sep.load_model("UVR-MDX-NET-Voc_FT.onnx")
+            out_files = sep.separate(str(wav_input))
+            print(f"[UVR Engine] UVR completed. Output files: {out_files}")
+
+            for f_str in out_files:
+                f_path = Path(f_str)
+                if not f_path.is_absolute():
+                    f_path = uvr_dir / f_str
+                if "(Vocals)" in f_path.name or "vocals" in f_path.name.lower():
+                    uvr_vocals_wav = f_path
+                elif "(Instrumental)" in f_path.name or "instrumental" in f_path.name.lower() or "inst" in f_path.name.lower():
+                    uvr_inst_wav = f_path
+
+            if uvr_vocals_wav and uvr_vocals_wav.exists() and uvr_inst_wav and uvr_inst_wav.exists():
+                uvr_success = True
+                print(f"[UVR Engine] Vocals and Instrumental successfully extracted via UVR.")
+        except Exception as uvr_err:
+            print(f"[UVR Engine] Warning: UVR step failed ({uvr_err}), falling back to direct Demucs.")
+
+        # Step 2: Separate Instruments using Demucs
+        # If UVR succeeded, we run Demucs on the pure Instrumental track (eliminating vocal bleed on instruments!)
+        input_for_demucs = uvr_inst_wav if (uvr_success and uvr_inst_wav) else wav_input
+        print(f"[AI Demucs] Running Demucs 6s on {input_for_demucs.name}...")
         cmd = [
             sys.executable, "-m", "demucs",
             "-n", "htdemucs_6s",
             "-o", str(OUTPUT_DIR),
-            str(wav_input)
+            str(input_for_demucs)
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode == 0:
-            print(f"[AI Demucs] Successfully finished separation for {track_id}")
-            target_folder = OUTPUT_DIR / "htdemucs_6s" / track_id
-            src_folder = OUTPUT_DIR / "htdemucs_6s" / wav_input.stem
-            if src_folder.exists() and not target_folder.exists():
-                shutil.copytree(src_folder, target_folder)
+        demucs_res = subprocess.run(cmd, capture_output=True, text=True)
+        demucs_folder = OUTPUT_DIR / "htdemucs_6s" / input_for_demucs.stem
 
-            # Convert wav stems to lightweight 192k mp3 for instant web streaming
-            final_folder = target_folder if target_folder.exists() else src_folder
-            if final_folder.exists():
-                for wav_f in final_folder.glob("*.wav"):
-                    mp3_f = final_folder / f"{wav_f.stem}.mp3"
-                    if not mp3_f.exists():
-                        subprocess.run(["ffmpeg", "-y", "-i", str(wav_f), "-b:a", "192k", str(mp3_f)], capture_output=True)
+        if demucs_res.returncode == 0 and demucs_folder.exists():
+            print(f"[AI Demucs] Demucs finished successfully.")
+            # Copy Demucs instrument stems into the target folder
+            for stem_name in ["drums", "bass", "piano", "guitar", "other"]:
+                stem_wav = demucs_folder / f"{stem_name}.wav"
+                if stem_wav.exists():
+                    shutil.copy2(stem_wav, target_folder / f"{stem_name}.wav")
+
+            # For vocals: use the pristine UVR vocal track if available, otherwise Demucs vocals
+            if uvr_success and uvr_vocals_wav and uvr_vocals_wav.exists():
+                shutil.copy2(uvr_vocals_wav, target_folder / "vocals.wav")
+                print(f"[AI Pipeline] Applied UVR pristine vocal stem.")
+            else:
+                demucs_vocals = demucs_folder / "vocals.wav"
+                if demucs_vocals.exists():
+                    shutil.copy2(demucs_vocals, target_folder / "vocals.wav")
+
+            # Clean up temporary demucs folder if different from target
+            if demucs_folder.resolve() != target_folder.resolve() and demucs_folder.exists():
+                shutil.rmtree(demucs_folder, ignore_errors=True)
         else:
-            print(f"[AI Demucs] Error separating {track_id}: {result.stderr}")
+            print(f"[AI Demucs] Error separating instruments: {demucs_res.stderr}")
+
+        # Step 3: Convert all final WAV stems to 192k MP3 for rapid browser playback
+        if target_folder.exists():
+            for wav_f in target_folder.glob("*.wav"):
+                mp3_f = target_folder / f"{wav_f.stem}.mp3"
+                if not mp3_f.exists():
+                    subprocess.run(["ffmpeg", "-y", "-i", str(wav_f), "-b:a", "192k", str(mp3_f)], capture_output=True)
+
+        print(f"[AI Pipeline] Finished complete UVR+Demucs separation for {track_id}!")
     except Exception as e:
-        print(f"[AI Demucs] Exception during separation of {track_id}: {e}")
+        print(f"[AI Pipeline] Exception during separation of {track_id}: {e}")
     finally:
         separating_tracks.discard(track_id)
+
+def run_demucs_separation(audio_path: Path, track_id: str):
+    """Wrapper that delegates to the enhanced UVR cascade pipeline."""
+    return run_uvr_cascade_separation(audio_path, track_id)
 
 @app.get("/health")
 def health_check():

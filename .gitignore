@@ -30,6 +30,10 @@ venv/
 ENV/
 uploads/
 separated/
+models/
+*.onnx
+*.ckpt
+*.pth
 
 # Logs
 *.log

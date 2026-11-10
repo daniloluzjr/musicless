@@ -5,3 +5,6 @@ demucs>=4.0.1
 torch>=2.2.0
 torchaudio>=2.2.0
 yt-dlp>=2024.3.10
+audio-separator[cpu]>=0.48.0
+audioread>=3.1.0
+
