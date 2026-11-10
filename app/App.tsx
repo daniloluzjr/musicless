@@ -58,7 +58,13 @@ const InstagramIcon = ({ size = 18, color = '#f8fafc' }: { size?: number; color?
   </Svg>
 );
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname === 'localhost' && window.location.port === '8081' ? 'http://localhost:8000' : '');
+
+const resolveUrl = (url?: string) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 const INITIAL_TRACKS: StemTrack[] = [
   {
@@ -244,8 +250,9 @@ export default function App() {
           let loaded = 0;
           await Promise.all(
             (['vocals', 'drums', 'bass', 'piano', 'brass', 'other'] as StemType[]).map(async (stemKey) => {
-              const stemUrl = data.stems[stemKey];
-              if (stemUrl) {
+              const rawStemUrl = data.stems[stemKey];
+              if (rawStemUrl) {
+                const stemUrl = resolveUrl(rawStemUrl);
                 const sRes = await fetch(stemUrl);
                 stemBuffers[stemKey] = await sRes.arrayBuffer();
                 loaded++;
@@ -385,8 +392,9 @@ export default function App() {
         let loaded = 0;
         await Promise.all(
           stemKeys.map(async (stemKey) => {
-            const stemUrl = data.stems[stemKey];
-            if (stemUrl) {
+            const rawStemUrl = data.stems[stemKey];
+            if (rawStemUrl) {
+              const stemUrl = resolveUrl(rawStemUrl);
               const res = await fetch(stemUrl);
               stemBuffers[stemKey] = await res.arrayBuffer();
               loaded++;
@@ -404,7 +412,7 @@ export default function App() {
         setUrlStatusMessage(`Ready! Loaded 6 isolated studio stems for "${data.title}". Zero bleed!`);
       } else {
         // Fetch and decode full track into 6-stem crossover filter engine immediately
-        const audioResponse = await fetch(data.audio_url);
+        const audioResponse = await fetch(resolveUrl(data.audio_url));
         const audioBuffer = await audioResponse.arrayBuffer();
         const trackDuration = await audioEngine.loadFullTrack(audioBuffer);
 

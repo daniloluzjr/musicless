@@ -1,0 +1,24 @@
+================================================================
+   🎵 MusicLess - AI Stem Separation & Practice Player
+================================================================
+
+Como usar no Windows:
+
+1. Se você já tem Python instalado:
+   - Dê dois cliques em: run-musicless.bat
+   - O MusicLess abrirá automaticamente no seu navegador padrão em http://localhost:8000!
+
+2. Primeira vez instalando dependências:
+   - Abra o terminal na pasta deste programa e rode:
+     pip install -r backend/requirements.txt
+   - Depois basta dar dois cliques em run-musicless.bat sempre que quiser praticar!
+
+Recursos incluídos:
+- 6 Stems Isolados: Voz (Karaokê), Bateria, Baixo, Teclados, Sopros, Guitarra
+- Motor Duplo de IA: UVR5 MDX-Net (vocal ultra-limpo) + Meta Demucs v4
+- Zero Bleed: sem vazamento vocal nas guitarras e bateria
+- Player Web Audio sincronizado com Solo, Mute e controle de velocidade (0.75x a 1.25x)
+
+GitHub: https://github.com/daniloluzjr/musicless
+Web Demo: https://musicless-app.vercel.app
+================================================================

@@ -44,3 +44,8 @@ yarn-error.log*
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Release packages
+build_pkg/
+MusicLess-Windows-*.zip
+*.zip

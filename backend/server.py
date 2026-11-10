@@ -220,7 +220,7 @@ def find_separated_stems(track_id: str):
             if vocals and drums and bass:
                 folder = stem_dir.name
                 model = stem_dir.parent.name
-                base = f"http://localhost:8000/separated/{model}/{folder}"
+                base = f"/separated/{model}/{folder}"
                 return {
                     "vocals": f"{base}/{vocals.name}",
                     "drums": f"{base}/{drums.name}",
@@ -294,7 +294,7 @@ async def separate_url(req: UrlRequest):
                 "title": title,
                 "artist": artist,
                 "duration": 450,
-                "audio_url": f"http://localhost:8000/audio/{f.name}",
+                "audio_url": f"/audio/{f.name}",
                 "track_id": output_filename,
                 "is_separated": stems is not None,
                 "stems": stems,
@@ -355,7 +355,7 @@ async def separate_url(req: UrlRequest):
         "title": title,
         "artist": artist,
         "duration": duration,
-        "audio_url": f"http://localhost:8000/audio/{output_filename}.{ext}",
+        "audio_url": f"/audio/{output_filename}.{ext}",
         "track_id": output_filename,
         "is_separated": False,
         "stems": None,
@@ -366,6 +366,15 @@ async def separate_url(req: UrlRequest):
 
     return result
 
+# Mount static frontend build if available (single-origin web app + API)
+DIST_DIR = Path(__file__).parent.parent / "app" / "dist"
+if not DIST_DIR.exists():
+    DIST_DIR = Path("dist")
+
+if DIST_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(DIST_DIR), html=True), name="frontend")
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
