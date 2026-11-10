@@ -308,6 +308,42 @@ export default function App() {
     }
   };
 
+  const handleLoadDemo = async () => {
+    setUrlStatus('loading');
+    setUrlStatusMessage('Loading 6 isolated studio stems (Vocals, Drums, Bass, Keys, Guitar, Horns)...');
+    setIsProcessingUrl(true);
+    try {
+      const stemKeys: StemType[] = ['vocals', 'drums', 'bass', 'piano', 'brass', 'other'];
+      const stemBuffers: Partial<Record<StemType, ArrayBuffer>> = {};
+      let loaded = 0;
+      await Promise.all(
+        stemKeys.map(async (stemKey) => {
+          const stemName = stemKey === 'brass' ? 'other' : stemKey;
+          const fileUrl = `/demo/${stemName}.mp3`;
+          const res = await fetch(fileUrl);
+          if (!res.ok) throw new Error(`Could not load stem ${stemName}`);
+          stemBuffers[stemKey] = await res.arrayBuffer();
+          loaded++;
+          setUrlStatusMessage(`Loading 6 isolated studio stems (${loaded}/6)...`);
+        })
+      );
+      setSongTitle('Depeche Mode - Enjoy The Silence (Live)');
+      setSongSubtitle('6 Isolated Studio Stems (UVR5 MDX-Net + Meta Demucs) • Zero Bleed');
+      const trackDuration = await audioEngine.loadAllStems(stemBuffers);
+      setDuration(trackDuration || 45);
+      setCurrentTime(0);
+      setIsPlaying(false);
+      setIsSongLoaded(true);
+      setUrlStatus('success');
+      setUrlStatusMessage('Demo loaded! Hit PLAY below to practice with isolated stems.');
+    } catch (err: any) {
+      setUrlStatus('error');
+      setUrlStatusMessage('Could not load demo stems: ' + (err.message || 'Network error'));
+    } finally {
+      setIsProcessingUrl(false);
+    }
+  };
+
   const handleProcessUrl = async () => {
     const trimmedUrl = urlInput.trim();
     if (!trimmedUrl) {
@@ -388,9 +424,16 @@ export default function App() {
     } catch (err: any) {
       console.error('URL extraction error:', err);
       setUrlStatus('error');
-      setUrlStatusMessage(
-        err.message || 'Could not connect to backend. Make sure the server is running on port 8000.'
-      );
+      const msg = err.message || '';
+      if (!msg || msg.includes('fetch') || msg.includes('Failed') || msg.includes('NetworkError')) {
+        setUrlStatusMessage(
+          'Cloud AI server is currently offline or unreachable. Click "⚡ Try Instant 6-Stem Demo" below to practice with 6 isolated tracks right now on the web!'
+        );
+      } else {
+        setUrlStatusMessage(
+          err.message || 'Could not connect to backend. Make sure the server is running on port 8000.'
+        );
+      }
     } finally {
       setIsProcessingUrl(false);
     }
@@ -808,6 +851,19 @@ export default function App() {
                     >
                       <Text style={styles.loadSongBtnText}>
                         {isProcessingUrl ? 'Extracting...' : 'Load & Separate'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.demoSuggestionsRow}>
+                    <TouchableOpacity
+                      style={styles.demoTrackChip}
+                      onPress={handleLoadDemo}
+                      disabled={isProcessingUrl}
+                    >
+                      <Sparkles size={13} color="#f59e0b" style={{ marginRight: 6 }} />
+                      <Text style={styles.demoTrackChipText}>
+                        ⚡ Try Instant 6-Stem Demo: <Text style={{ color: '#38bdf8', fontWeight: '700' }}>Enjoy The Silence</Text> (Zero Bleed)
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -2041,6 +2097,28 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  demoSuggestionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    flexWrap: 'wrap',
+  },
+  demoTrackChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#f59e0b44',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  demoTrackChipText: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '500',
   },
   fileInputRow: {
     alignItems: 'center',
