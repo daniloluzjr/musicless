@@ -90,8 +90,8 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
     update_track_status(
         track_id,
         stage="convert",
-        stage_title="1/4 • Preparando Áudio",
-        message="Convertendo áudio para formato 44.1kHz estéreo sem perdas...",
+        stage_title="1/4 • Preparing Audio",
+        message="Converting audio to lossless 44.1kHz stereo format...",
         percent=15
     )
 
@@ -125,8 +125,8 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
         update_track_status(
             track_id,
             stage="uvr_vocals",
-            stage_title="2/4 • Isolamento Vocal UVR5 MDX-Net",
-            message="Rede Neural UVR5 MDX-Net: Isolando vocais puros sem vazamento instrumental...",
+            stage_title="2/4 • UVR5 MDX-Net Vocal Isolation",
+            message="UVR5 MDX-Net Neural Network: Isolating pristine vocals with zero instrument bleed...",
             percent=35
         )
 
@@ -169,8 +169,8 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
         update_track_status(
             track_id,
             stage="demucs_instruments",
-            stage_title="3/4 • Separação Multi-Pistas (Meta Demucs v4)",
-            message="Meta Demucs v4: Isolando Bateria, Baixo, Teclados, Guitarra e Metais...",
+            stage_title="3/4 • Multi-Stem Separation (Meta Demucs v4)",
+            message="Meta Demucs v4: Isolating Drums, Bass, Keyboards, Guitar and Brass...",
             percent=70
         )
 
@@ -221,8 +221,8 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
         update_track_status(
             track_id,
             stage="rendering",
-            stage_title="4/4 • Otimizando Faixas de Estúdio",
-            message="Convertendo 6 faixas para MP3 192kbps de alta fidelidade...",
+            stage_title="4/4 • Studio Optimization",
+            message="Encoding 6 isolated stems into high-fidelity 192kbps MP3s...",
             percent=90
         )
 
@@ -237,8 +237,8 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
         update_track_status(
             track_id,
             stage="ready",
-            stage_title="Concluído com Sucesso!",
-            message="Todas as 6 pistas isoladas estão prontas e carregadas no mixer!",
+            stage_title="Separation Complete!",
+            message="All 6 isolated studio stems are ready and loaded into the mixer!",
             percent=100,
             status="completed"
         )
@@ -248,8 +248,8 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
         update_track_status(
             track_id,
             stage="cancelled",
-            stage_title="Cancelado",
-            message="Separação interrompida pelo usuário.",
+            stage_title="Cancelled",
+            message="Separation process stopped by user.",
             percent=0,
             status="cancelled"
         )
@@ -258,8 +258,8 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
         update_track_status(
             track_id,
             stage="error",
-            stage_title="Erro no Processamento",
-            message=f"Falha na separação: {str(e)}",
+            stage_title="Processing Error",
+            message=f"Separation failed: {str(e)}",
             percent=0,
             status="error"
         )
@@ -346,8 +346,8 @@ def get_track_stems(track_id: str):
             "is_processing": False,
             "percent": 100,
             "stage": "ready",
-            "stage_title": "Concluído",
-            "message": "Todas as pistas isoladas foram carregadas com sucesso!"
+            "stage_title": "Complete",
+            "message": "All isolated studio tracks loaded successfully!"
         }
     status = track_status.get(track_id, {})
     is_proc = (track_id in separating_tracks) or (status.get("status") == "processing")
@@ -356,8 +356,8 @@ def get_track_stems(track_id: str):
         "is_processing": is_proc,
         "status": status.get("status", "processing" if is_proc else "idle"),
         "stage": status.get("stage", "processing" if is_proc else "idle"),
-        "stage_title": status.get("stage_title", "IA Processando..." if is_proc else "Aguardando"),
-        "message": status.get("message", "Separando faixas com IA neural no seu computador..."),
+        "stage_title": status.get("stage_title", "AI Processing..." if is_proc else "Idle"),
+        "message": status.get("message", "Isolating stems with neural AI on your computer..."),
         "percent": status.get("percent", 20 if is_proc else 0),
     }
 
@@ -374,12 +374,12 @@ def cancel_separation(track_id: str):
     track_status[track_id] = {
         "status": "cancelled",
         "stage": "cancelled",
-        "stage_title": "Cancelado",
-        "message": "Separação cancelada pelo usuário.",
+        "stage_title": "Cancelled",
+        "message": "Separation process cancelled by user.",
         "percent": 0
     }
     separating_tracks.discard(track_id)
-    return {"status": "ok", "message": "Separação cancelada com sucesso."}
+    return {"status": "ok", "message": "Separation cancelled successfully."}
 
 @app.post("/shutdown")
 def shutdown_app():
@@ -393,7 +393,7 @@ def shutdown_app():
                 pass
         os._exit(0)
     threading.Thread(target=_do_kill, daemon=True).start()
-    return {"status": "ok", "message": "MusicLess encerrado com sucesso! A memória foi liberada."}
+    return {"status": "ok", "message": "MusicLess shut down successfully! Memory released."}
 
 class UrlRequest(BaseModel):
     url: str

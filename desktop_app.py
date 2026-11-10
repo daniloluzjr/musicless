@@ -5,12 +5,6 @@ import time
 import webbrowser
 from pathlib import Path
 
-# Protect against None stdout/stderr when running via pyw / pythonw
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w")
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w")
-
 # Add backend directory to sys.path
 BASE_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = BASE_DIR / "backend"
@@ -25,27 +19,35 @@ def start_server():
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
 
 def main():
-    print("=" * 60)
-    print("   🎵 MusicLess - AI Stem Separation & Practice Mixer")
-    print("=" * 60)
-    print("\nIniciando servidor local de IA (UVR5 MDX-Net + Meta Demucs v4)...")
-    
     server_thread = threading.Thread(target=start_server, daemon=True)
     server_thread.start()
-    
-    time.sleep(1.5)
+    time.sleep(1.2)
+
     url = "http://127.0.0.1:8000"
-    print(f"Abrindo MusicLess Studio no seu navegador: {url}")
-    webbrowser.open(url)
-    print("\n[PRONTO] MusicLess ativo em http://127.0.0.1:8000")
-    print("Para fechar o programa a qualquer momento, clique em 'Fechar MusicLess' no navegador.")
-    print("Ou pressione Ctrl+C nesta janela.\n")
-    
+
+    # Launch native desktop application window using pywebview (Edge WebView2)
     try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nMusicLess encerrado com sucesso. Até a próxima!")
+        import webview
+        window = webview.create_window(
+            title="MusicLess - AI Stem Separation & Practice Player",
+            url=url,
+            width=1280,
+            height=860,
+            min_size=(980, 680),
+            background_color="#090d16"
+        )
+        webview.start()
+    except Exception:
+        # Fallback to browser if webview encounters any issue
+        webbrowser.open(url)
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+    finally:
+        # When native window is closed, immediately terminate background server and free RAM
+        os._exit(0)
 
 if __name__ == "__main__":
     main()

@@ -261,6 +261,9 @@ export default function App() {
     setTracks(INITIAL_TRACKS);
   };
 
+  const isLocalHost = Platform.OS === 'web' && typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
   const handleCancelSeparation = async () => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -269,7 +272,7 @@ export default function App() {
     setIsAiSeparating(false);
     setAiSeparationTrackId(null);
     setAiSeparationPercent(0);
-    setUrlStatusMessage('Separação cancelada.');
+    setUrlStatusMessage('Separation cancelled.');
     if (currentId) {
       try {
         await fetch(`${API_BASE_URL}/cancel-separation/${currentId}`, { method: 'POST' });
@@ -294,8 +297,8 @@ export default function App() {
     setIsAiSeparating(true);
     setAiSeparationTrackId(trackId);
     setAiSeparationPercent(15);
-    setAiSeparationStageTitle('1/4 • Preparando Áudio');
-    setAiSeparationMessage('Iniciando pipeline de IA (UVR5 MDX-Net + Meta Demucs v4)...');
+    setAiSeparationStageTitle('1/4 • Preparing Audio');
+    setAiSeparationMessage('Starting neural AI pipeline (UVR5 MDX-Net + Meta Demucs v4)...');
 
     let attempts = 0;
     const maxAttempts = 120; // 6 minutes maximum
@@ -333,8 +336,8 @@ export default function App() {
         if (data.is_separated && data.stems) {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
           setAiSeparationPercent(100);
-          setAiSeparationStageTitle('Concluído!');
-          setAiSeparationMessage('Carregando as 6 faixas isoladas no mixer...');
+          setAiSeparationStageTitle('Complete!');
+          setAiSeparationMessage('Loading 6 isolated studio stems into mixer...');
 
           const stemBuffers: Partial<Record<StemType, ArrayBuffer>> = {};
           let loaded = 0;
@@ -346,7 +349,7 @@ export default function App() {
                 const sRes = await fetch(stemUrl);
                 stemBuffers[stemKey] = await sRes.arrayBuffer();
                 loaded++;
-                setAiSeparationMessage(`Carregando pistas no mixer (${loaded}/6)...`);
+                setAiSeparationMessage(`Loading isolated stems into mixer (${loaded}/6)...`);
               }
             })
           );
@@ -360,9 +363,9 @@ export default function App() {
             await audioEngine.play();
             setIsPlaying(true);
           }
-          setSongSubtitle((prev) => `${prev.split('•')[0].trim()} • UVR5 + Demucs v4 (6 Faixas Isoladas Sem Vazamento)`);
+          setSongSubtitle((prev) => `${prev.split('•')[0].trim()} • UVR5 + Demucs v4 (6 Isolated Tracks - Zero Bleed)`);
           setUrlStatus('success');
-          setUrlStatusMessage(`✨ IA UVR5 + Demucs: 6 faixas de estúdio carregadas para "${songName}"! Zero vazamento.`);
+          setUrlStatusMessage(`✨ UVR5 + Demucs AI: 6 isolated studio tracks loaded for "${songName}"! Zero bleed.`);
           setTimeout(() => {
             setIsAiSeparating(false);
           }, 1500);
@@ -686,14 +689,16 @@ export default function App() {
         </View>
 
         <View style={styles.headerRightActions}>
-          {/* STOP / SHUTDOWN LOCAL SERVER BUTTON */}
-          <TouchableOpacity
-            style={styles.stopServerBtn}
-            onPress={() => setShowShutdownModal(true)}
-          >
-            <Power size={13} color="#f87171" />
-            <Text style={styles.stopServerText}>Fechar MusicLess</Text>
-          </TouchableOpacity>
+          {/* STOP LOCAL ENGINE BUTTON (ONLY SHOWN WHEN RUNNING LOCALLY) */}
+          {isLocalHost && (
+            <TouchableOpacity
+              style={styles.stopServerBtn}
+              onPress={() => setShowShutdownModal(true)}
+            >
+              <Power size={13} color="#f87171" />
+              <Text style={styles.stopServerText}>Stop Server</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.downloadDesktopBtn}
@@ -854,23 +859,23 @@ export default function App() {
             <View style={styles.shutdownIconCircle}>
               <Power size={26} color="#ef4444" />
             </View>
-            <Text style={styles.shutdownModalTitle}>Encerrar o MusicLess?</Text>
+            <Text style={styles.shutdownModalTitle}>Quit MusicLess?</Text>
             <Text style={styles.shutdownModalBody}>
-              Isso vai desligar o servidor local e liberar toda a memória RAM e uso de processador do seu computador.
+              This will shut down the local background AI engine and release all system RAM and CPU resources.
             </Text>
             <View style={styles.shutdownModalActions}>
               <TouchableOpacity
                 style={styles.cancelShutdownBtn}
                 onPress={() => setShowShutdownModal(false)}
               >
-                <Text style={styles.cancelShutdownBtnText}>Continuar Praticando</Text>
+                <Text style={styles.cancelShutdownBtnText}>Keep Practicing</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.confirmShutdownBtn}
                 onPress={handleShutdownServer}
               >
                 <Power size={14} color="#ffffff" />
-                <Text style={styles.confirmShutdownBtnText}>Sim, Fechar Agora</Text>
+                <Text style={styles.confirmShutdownBtnText}>Yes, Quit Now</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -884,12 +889,12 @@ export default function App() {
             <View style={styles.shutdownDoneIconCircle}>
               <CheckCircle2 size={42} color="#22c55e" />
             </View>
-            <Text style={styles.shutdownDoneTitle}>MusicLess Encerrado</Text>
+            <Text style={styles.shutdownDoneTitle}>MusicLess Stopped</Text>
             <Text style={styles.shutdownDoneBody}>
-              O servidor local foi desativado e toda a memória RAM e CPU foram liberadas no seu computador com sucesso.
+              The local server has been shut down and all system RAM and CPU resources have been freed.
             </Text>
             <Text style={styles.shutdownDoneSubtext}>
-              Você já pode fechar esta aba ou janela do seu navegador com tranquilidade.
+              You can now safely close this window or browser tab.
             </Text>
           </View>
         </View>
@@ -1078,23 +1083,23 @@ export default function App() {
                     <Sparkles size={16} color="#38bdf8" />
                   </View>
                   <View>
-                    <Text style={styles.aiStudioTitle}>IA Neural Separando Faixas em Tempo Real</Text>
+                    <Text style={styles.aiStudioTitle}>Neural AI Isolating Stems in Real-Time</Text>
                     <Text style={styles.aiStudioSubtitle}>
-                      UVR5 MDX-Net + Meta Demucs v4 • Zero Vazamento
+                      UVR5 MDX-Net + Meta Demucs v4 • Zero Bleed Isolation
                     </Text>
                   </View>
                 </View>
                 <View style={styles.aiStudioHeaderRight}>
                   <View style={styles.aiEngineBadge}>
                     <Cpu size={12} color="#38bdf8" />
-                    <Text style={styles.aiEngineBadgeText}>CPU Local • Ilimitado</Text>
+                    <Text style={styles.aiEngineBadgeText}>Local CPU • Unlimited</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.cancelSeparationBtn}
                     onPress={handleCancelSeparation}
                   >
                     <X size={13} color="#f87171" />
-                    <Text style={styles.cancelSeparationBtnText}>Cancelar</Text>
+                    <Text style={styles.cancelSeparationBtnText}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1106,7 +1111,7 @@ export default function App() {
 
               <View style={styles.aiStatusRow}>
                 <Text style={styles.aiStageTitleText}>
-                  {aiSeparationStageTitle || 'Processando com IA...'}
+                  {aiSeparationStageTitle || 'AI Processing...'}
                 </Text>
                 <Text style={styles.aiPercentText}>{aiSeparationPercent}%</Text>
               </View>
@@ -1116,21 +1121,21 @@ export default function App() {
               {/* 4 Steps Indicator */}
               <View style={styles.aiStepsRow}>
                 <View style={[styles.aiStepItem, aiSeparationPercent >= 15 && styles.aiStepItemActive]}>
-                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 15 && styles.aiStepItemTextActive]}>1. Áudio HD</Text>
+                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 15 && styles.aiStepItemTextActive]}>1. HD Audio</Text>
                 </View>
                 <View style={[styles.aiStepItem, aiSeparationPercent >= 35 && styles.aiStepItemActive]}>
-                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 35 && styles.aiStepItemTextActive]}>2. UVR5 Vocais</Text>
+                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 35 && styles.aiStepItemTextActive]}>2. UVR5 Vocals</Text>
                 </View>
                 <View style={[styles.aiStepItem, aiSeparationPercent >= 70 && styles.aiStepItemActive]}>
                   <Text style={[styles.aiStepItemText, aiSeparationPercent >= 70 && styles.aiStepItemTextActive]}>3. Demucs 6s</Text>
                 </View>
                 <View style={[styles.aiStepItem, aiSeparationPercent >= 90 && styles.aiStepItemActive]}>
-                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 90 && styles.aiStepItemTextActive]}>4. Mixer HD</Text>
+                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 90 && styles.aiStepItemTextActive]}>4. HD Mixer</Text>
                 </View>
               </View>
 
               <Text style={styles.aiDisclaimerText}>
-                💡 O áudio prévio já pode ser reproduzido no mixer abaixo! Assim que a IA terminar (~1 a 2 min), as 6 pistas isoladas carregarão automaticamente.
+                💡 Preview audio is already playable in the mixer below! As soon as AI separation finishes (~1-2 min), all 6 isolated studio tracks will automatically load.
               </Text>
             </View>
           )}
