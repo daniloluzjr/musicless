@@ -6,6 +6,12 @@ import json
 import threading
 import sys
 from pathlib import Path
+
+# Protect against None stdout/stderr when running via pyw / pythonw
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -51,6 +57,20 @@ app.mount("/separated", StaticFiles(directory=str(OUTPUT_DIR)), name="separated"
 app.mount("/audio", StaticFiles(directory=str(UPLOAD_DIR)), name="audio")
 
 separating_tracks = set()
+track_status = {}
+cancellation_flags = set()
+active_subprocesses = {}
+
+def update_track_status(track_id: str, stage: str, stage_title: str, message: str, percent: int, status: str = "processing"):
+    track_status[track_id] = {
+        "status": status,
+        "stage": stage,
+        "stage_title": stage_title,
+        "message": message,
+        "percent": percent,
+        "updated_at": time.time()
+    }
+    print(f"[AI Pipeline {track_id}] [{percent}%] {stage_title}: {message}")
 
 def run_uvr_cascade_separation(audio_path: Path, track_id: str):
     """
@@ -65,15 +85,34 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
     if track_id in separating_tracks:
         return
     separating_tracks.add(track_id)
+    cancellation_flags.discard(track_id)
+    
+    update_track_status(
+        track_id,
+        stage="convert",
+        stage_title="1/4 • Preparando Áudio",
+        message="Convertendo áudio para formato 44.1kHz estéreo sem perdas...",
+        percent=15
+    )
+
     try:
+        if track_id in cancellation_flags:
+            raise InterruptedError("Cancelled by user")
+
         wav_input = UPLOAD_DIR / f"{track_id}.wav"
         if not wav_input.exists() or wav_input.stat().st_size == 0:
             print(f"[AI Pipeline] Converting {audio_path.name} to 44.1kHz stereo WAV...")
-            subprocess.run([
+            p_conv = subprocess.Popen([
                 "ffmpeg", "-y", "-i", str(audio_path),
                 "-ar", "44100", "-ac", "2",
                 str(wav_input)
-            ], check=True, capture_output=True)
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            active_subprocesses[track_id] = p_conv
+            p_conv.wait()
+            active_subprocesses.pop(track_id, None)
+
+        if track_id in cancellation_flags:
+            raise InterruptedError("Cancelled by user")
 
         target_folder = OUTPUT_DIR / "htdemucs_6s" / track_id
         target_folder.mkdir(parents=True, exist_ok=True)
@@ -83,6 +122,14 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
         uvr_inst_wav = None
 
         # Step 1: UVR Separation for Ultra-Clean Vocals & Instrumental
+        update_track_status(
+            track_id,
+            stage="uvr_vocals",
+            stage_title="2/4 • Isolamento Vocal UVR5 MDX-Net",
+            message="Rede Neural UVR5 MDX-Net: Isolando vocais puros sem vazamento instrumental...",
+            percent=35
+        )
+
         try:
             print(f"[UVR Engine] Running MDX-Net vocal separation for {track_id}...")
             from audio_separator.separator import Separator
@@ -113,9 +160,20 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
         except Exception as uvr_err:
             print(f"[UVR Engine] Warning: UVR step failed ({uvr_err}), falling back to direct Demucs.")
 
+        if track_id in cancellation_flags:
+            raise InterruptedError("Cancelled by user")
+
         # Step 2: Separate Instruments using Demucs
         # If UVR succeeded, we run Demucs on the pure Instrumental track (eliminating vocal bleed on instruments!)
         input_for_demucs = uvr_inst_wav if (uvr_success and uvr_inst_wav) else wav_input
+        update_track_status(
+            track_id,
+            stage="demucs_instruments",
+            stage_title="3/4 • Separação Multi-Pistas (Meta Demucs v4)",
+            message="Meta Demucs v4: Isolando Bateria, Baixo, Teclados, Guitarra e Metais...",
+            percent=70
+        )
+
         print(f"[AI Demucs] Running Demucs 6s on {input_for_demucs.name}...")
         cmd = [
             sys.executable, "-m", "demucs",
@@ -123,10 +181,17 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
             "-o", str(OUTPUT_DIR),
             str(input_for_demucs)
         ]
-        demucs_res = subprocess.run(cmd, capture_output=True, text=True)
+        p_demucs = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        active_subprocesses[track_id] = p_demucs
+        _, demucs_err = p_demucs.communicate()
+        active_subprocesses.pop(track_id, None)
+
+        if track_id in cancellation_flags:
+            raise InterruptedError("Cancelled by user")
+
         demucs_folder = OUTPUT_DIR / "htdemucs_6s" / input_for_demucs.stem
 
-        if demucs_res.returncode == 0 and demucs_folder.exists():
+        if p_demucs.returncode == 0 and demucs_folder.exists():
             print(f"[AI Demucs] Demucs finished successfully.")
             # Copy Demucs instrument stems into the target folder
             for stem_name in ["drums", "bass", "piano", "guitar", "other"]:
@@ -147,19 +212,59 @@ def run_uvr_cascade_separation(audio_path: Path, track_id: str):
             if demucs_folder.resolve() != target_folder.resolve() and demucs_folder.exists():
                 shutil.rmtree(demucs_folder, ignore_errors=True)
         else:
-            print(f"[AI Demucs] Error separating instruments: {demucs_res.stderr}")
+            print(f"[AI Demucs] Error separating instruments: {demucs_err}")
+
+        if track_id in cancellation_flags:
+            raise InterruptedError("Cancelled by user")
 
         # Step 3: Convert all final WAV stems to 192k MP3 for rapid browser playback
+        update_track_status(
+            track_id,
+            stage="rendering",
+            stage_title="4/4 • Otimizando Faixas de Estúdio",
+            message="Convertendo 6 faixas para MP3 192kbps de alta fidelidade...",
+            percent=90
+        )
+
         if target_folder.exists():
             for wav_f in target_folder.glob("*.wav"):
+                if track_id in cancellation_flags:
+                    raise InterruptedError("Cancelled by user")
                 mp3_f = target_folder / f"{wav_f.stem}.mp3"
                 if not mp3_f.exists():
                     subprocess.run(["ffmpeg", "-y", "-i", str(wav_f), "-b:a", "192k", str(mp3_f)], capture_output=True)
 
+        update_track_status(
+            track_id,
+            stage="ready",
+            stage_title="Concluído com Sucesso!",
+            message="Todas as 6 pistas isoladas estão prontas e carregadas no mixer!",
+            percent=100,
+            status="completed"
+        )
         print(f"[AI Pipeline] Finished complete UVR+Demucs separation for {track_id}!")
+    except InterruptedError:
+        print(f"[AI Pipeline] Separation of {track_id} was cancelled by user.")
+        update_track_status(
+            track_id,
+            stage="cancelled",
+            stage_title="Cancelado",
+            message="Separação interrompida pelo usuário.",
+            percent=0,
+            status="cancelled"
+        )
     except Exception as e:
         print(f"[AI Pipeline] Exception during separation of {track_id}: {e}")
+        update_track_status(
+            track_id,
+            stage="error",
+            stage_title="Erro no Processamento",
+            message=f"Falha na separação: {str(e)}",
+            percent=0,
+            status="error"
+        )
     finally:
+        active_subprocesses.pop(track_id, None)
         separating_tracks.discard(track_id)
 
 def run_demucs_separation(audio_path: Path, track_id: str):
@@ -235,8 +340,60 @@ def find_separated_stems(track_id: str):
 def get_track_stems(track_id: str):
     stems = find_separated_stems(track_id)
     if stems:
-        return {"is_separated": True, "stems": stems, "is_processing": False}
-    return {"is_separated": False, "is_processing": track_id in separating_tracks}
+        return {
+            "is_separated": True,
+            "stems": stems,
+            "is_processing": False,
+            "percent": 100,
+            "stage": "ready",
+            "stage_title": "Concluído",
+            "message": "Todas as pistas isoladas foram carregadas com sucesso!"
+        }
+    status = track_status.get(track_id, {})
+    is_proc = (track_id in separating_tracks) or (status.get("status") == "processing")
+    return {
+        "is_separated": False,
+        "is_processing": is_proc,
+        "status": status.get("status", "processing" if is_proc else "idle"),
+        "stage": status.get("stage", "processing" if is_proc else "idle"),
+        "stage_title": status.get("stage_title", "IA Processando..." if is_proc else "Aguardando"),
+        "message": status.get("message", "Separando faixas com IA neural no seu computador..."),
+        "percent": status.get("percent", 20 if is_proc else 0),
+    }
+
+@app.post("/cancel-separation/{track_id}")
+def cancel_separation(track_id: str):
+    """Cancels the active separation process for a given track."""
+    cancellation_flags.add(track_id)
+    proc = active_subprocesses.get(track_id)
+    if proc:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    track_status[track_id] = {
+        "status": "cancelled",
+        "stage": "cancelled",
+        "stage_title": "Cancelado",
+        "message": "Separação cancelada pelo usuário.",
+        "percent": 0
+    }
+    separating_tracks.discard(track_id)
+    return {"status": "ok", "message": "Separação cancelada com sucesso."}
+
+@app.post("/shutdown")
+def shutdown_app():
+    """Terminates the MusicLess local server and frees CPU and RAM."""
+    def _do_kill():
+        time.sleep(0.4)
+        for p in list(active_subprocesses.values()):
+            try:
+                p.terminate()
+            except Exception:
+                pass
+        os._exit(0)
+    threading.Thread(target=_do_kill, daemon=True).start()
+    return {"status": "ok", "message": "MusicLess encerrado com sucesso! A memória foi liberada."}
 
 class UrlRequest(BaseModel):
     url: str

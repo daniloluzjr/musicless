@@ -42,6 +42,8 @@ import {
   ExternalLink,
   Download,
   Monitor,
+  Power,
+  Cpu,
 } from 'lucide-react-native';
 import { StemTrack, StemType } from './src/types';
 import { audioEngine } from './src/audio/StemAudioEngine';
@@ -186,6 +188,16 @@ export default function App() {
   const [songSubtitle, setSongSubtitle] = useState('');
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
+  // Real-time AI Studio Separation tracking
+  const [isAiSeparating, setIsAiSeparating] = useState(false);
+  const [aiSeparationTrackId, setAiSeparationTrackId] = useState<string | null>(null);
+  const [aiSeparationPercent, setAiSeparationPercent] = useState<number>(0);
+  const [aiSeparationStageTitle, setAiSeparationStageTitle] = useState<string>('');
+  const [aiSeparationMessage, setAiSeparationMessage] = useState<string>('');
+  const [showShutdownModal, setShowShutdownModal] = useState<boolean>(false);
+  const [isShutdown, setIsShutdown] = useState<boolean>(false);
+  const pollingIntervalRef = useRef<any>(null);
+
   const handleChooseFile = () => {
     if (Platform.OS === 'web') {
       const fileInput = document.createElement('input');
@@ -228,6 +240,10 @@ export default function App() {
   };
 
   const handleChangeSong = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+    setIsAiSeparating(false);
     audioEngine.reset();
     setIsPlaying(false);
     setIsSongLoaded(false);
@@ -245,22 +261,81 @@ export default function App() {
     setTracks(INITIAL_TRACKS);
   };
 
+  const handleCancelSeparation = async () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+    const currentId = aiSeparationTrackId;
+    setIsAiSeparating(false);
+    setAiSeparationTrackId(null);
+    setAiSeparationPercent(0);
+    setUrlStatusMessage('Separação cancelada.');
+    if (currentId) {
+      try {
+        await fetch(`${API_BASE_URL}/cancel-separation/${currentId}`, { method: 'POST' });
+      } catch {}
+    }
+  };
+
+  const handleShutdownServer = async () => {
+    setShowShutdownModal(false);
+    setIsShutdown(true);
+    try {
+      await fetch(`${API_BASE_URL}/shutdown`, { method: 'POST' });
+    } catch {
+      // Expected if server kills itself immediately
+    }
+  };
+
   const pollForSeparatedStems = (trackId: string, songName: string) => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+    setIsAiSeparating(true);
+    setAiSeparationTrackId(trackId);
+    setAiSeparationPercent(15);
+    setAiSeparationStageTitle('1/4 • Preparando Áudio');
+    setAiSeparationMessage('Iniciando pipeline de IA (UVR5 MDX-Net + Meta Demucs v4)...');
+
     let attempts = 0;
-    const maxAttempts = 60; // 5 minutes polling
-    const interval = setInterval(async () => {
+    const maxAttempts = 120; // 6 minutes maximum
+    pollingIntervalRef.current = setInterval(async () => {
       attempts++;
       if (attempts > maxAttempts) {
-        clearInterval(interval);
+        if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+        setIsAiSeparating(false);
         return;
       }
       try {
         const res = await fetch(`${API_BASE_URL}/track-stems/${trackId}`);
         if (!res.ok) return;
         const data = await res.json();
+
+        if (data.status === 'cancelled') {
+          if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+          setIsAiSeparating(false);
+          return;
+        }
+
+        if (data.is_processing) {
+          setIsAiSeparating(true);
+          if (typeof data.percent === 'number') {
+            setAiSeparationPercent(data.percent);
+          }
+          if (data.stage_title) {
+            setAiSeparationStageTitle(data.stage_title);
+          }
+          if (data.message) {
+            setAiSeparationMessage(data.message);
+          }
+        }
+
         if (data.is_separated && data.stems) {
-          clearInterval(interval);
-          setUrlStatusMessage(`Demucs AI completed! Loading 6 isolated studio stems...`);
+          if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+          setAiSeparationPercent(100);
+          setAiSeparationStageTitle('Concluído!');
+          setAiSeparationMessage('Carregando as 6 faixas isoladas no mixer...');
+
           const stemBuffers: Partial<Record<StemType, ArrayBuffer>> = {};
           let loaded = 0;
           await Promise.all(
@@ -271,7 +346,7 @@ export default function App() {
                 const sRes = await fetch(stemUrl);
                 stemBuffers[stemKey] = await sRes.arrayBuffer();
                 loaded++;
-                setUrlStatusMessage(`Loading 6 isolated studio stems (${loaded}/6)...`);
+                setAiSeparationMessage(`Carregando pistas no mixer (${loaded}/6)...`);
               }
             })
           );
@@ -285,14 +360,17 @@ export default function App() {
             await audioEngine.play();
             setIsPlaying(true);
           }
-          setSongSubtitle((prev) => `${prev.split('•')[0].trim()} • Demucs v4 AI Studio Stems (6 Tracks Isolated)`);
+          setSongSubtitle((prev) => `${prev.split('•')[0].trim()} • UVR5 + Demucs v4 (6 Faixas Isoladas Sem Vazamento)`);
           setUrlStatus('success');
-          setUrlStatusMessage(`✨ Demucs v4 AI: 6 isolated studio tracks loaded for "${songName}"! Zero bleed.`);
+          setUrlStatusMessage(`✨ IA UVR5 + Demucs: 6 faixas de estúdio carregadas para "${songName}"! Zero vazamento.`);
+          setTimeout(() => {
+            setIsAiSeparating(false);
+          }, 1500);
         }
       } catch {
         // silent retry
       }
-    }, 5000);
+    }, 3000);
   };
 
   const handleSeparateUploadedFile = async () => {
@@ -312,10 +390,6 @@ export default function App() {
 
       if (response.ok) {
         const data = await response.json();
-        Alert.alert(
-          'AI Separation Started',
-          'Meta Demucs v4 is isolating 6 studio tracks in the background. They will automatically load once ready!'
-        );
         pollForSeparatedStems(data.track_id, selectedFile.name);
       } else {
         throw new Error('Backend offline');
@@ -612,6 +686,15 @@ export default function App() {
         </View>
 
         <View style={styles.headerRightActions}>
+          {/* STOP / SHUTDOWN LOCAL SERVER BUTTON */}
+          <TouchableOpacity
+            style={styles.stopServerBtn}
+            onPress={() => setShowShutdownModal(true)}
+          >
+            <Power size={13} color="#f87171" />
+            <Text style={styles.stopServerText}>Fechar MusicLess</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.downloadDesktopBtn}
             onPress={handleDownloadDirectZip}
@@ -758,6 +841,59 @@ export default function App() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* SHUTDOWN CONFIRMATION MODAL */}
+      <Modal
+        visible={showShutdownModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowShutdownModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowShutdownModal(false)}>
+          <Pressable style={styles.shutdownModalCard} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.shutdownIconCircle}>
+              <Power size={26} color="#ef4444" />
+            </View>
+            <Text style={styles.shutdownModalTitle}>Encerrar o MusicLess?</Text>
+            <Text style={styles.shutdownModalBody}>
+              Isso vai desligar o servidor local e liberar toda a memória RAM e uso de processador do seu computador.
+            </Text>
+            <View style={styles.shutdownModalActions}>
+              <TouchableOpacity
+                style={styles.cancelShutdownBtn}
+                onPress={() => setShowShutdownModal(false)}
+              >
+                <Text style={styles.cancelShutdownBtnText}>Continuar Praticando</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmShutdownBtn}
+                onPress={handleShutdownServer}
+              >
+                <Power size={14} color="#ffffff" />
+                <Text style={styles.confirmShutdownBtnText}>Sim, Fechar Agora</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* FULLSCREEN SHUTDOWN NOTIFICATION */}
+      {isShutdown && (
+        <View style={styles.shutdownFullscreenOverlay}>
+          <View style={styles.shutdownDoneCard}>
+            <View style={styles.shutdownDoneIconCircle}>
+              <CheckCircle2 size={42} color="#22c55e" />
+            </View>
+            <Text style={styles.shutdownDoneTitle}>MusicLess Encerrado</Text>
+            <Text style={styles.shutdownDoneBody}>
+              O servidor local foi desativado e toda a memória RAM e CPU foram liberadas no seu computador com sucesso.
+            </Text>
+            <Text style={styles.shutdownDoneSubtext}>
+              Você já pode fechar esta aba ou janela do seu navegador com tranquilidade.
+            </Text>
+          </View>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
 
@@ -930,6 +1066,72 @@ export default function App() {
               >
                 <Text style={styles.changeSongHeaderText}>Change Song</Text>
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* REAL-TIME AI STUDIO SEPARATION CARD */}
+          {isAiSeparating && (
+            <View style={styles.aiStudioSeparationCard}>
+              <View style={styles.aiStudioCardHeader}>
+                <View style={styles.aiStudioTitleRow}>
+                  <View style={styles.aiPulseIcon}>
+                    <Sparkles size={16} color="#38bdf8" />
+                  </View>
+                  <View>
+                    <Text style={styles.aiStudioTitle}>IA Neural Separando Faixas em Tempo Real</Text>
+                    <Text style={styles.aiStudioSubtitle}>
+                      UVR5 MDX-Net + Meta Demucs v4 • Zero Vazamento
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.aiStudioHeaderRight}>
+                  <View style={styles.aiEngineBadge}>
+                    <Cpu size={12} color="#38bdf8" />
+                    <Text style={styles.aiEngineBadgeText}>CPU Local • Ilimitado</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.cancelSeparationBtn}
+                    onPress={handleCancelSeparation}
+                  >
+                    <X size={13} color="#f87171" />
+                    <Text style={styles.cancelSeparationBtnText}>Cancelar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Animated Progress Bar */}
+              <View style={styles.aiProgressBarTrack}>
+                <View style={[styles.aiProgressBarFill, { width: `${Math.max(5, Math.min(100, aiSeparationPercent))}%` }]} />
+              </View>
+
+              <View style={styles.aiStatusRow}>
+                <Text style={styles.aiStageTitleText}>
+                  {aiSeparationStageTitle || 'Processando com IA...'}
+                </Text>
+                <Text style={styles.aiPercentText}>{aiSeparationPercent}%</Text>
+              </View>
+
+              <Text style={styles.aiDetailMessageText}>{aiSeparationMessage}</Text>
+
+              {/* 4 Steps Indicator */}
+              <View style={styles.aiStepsRow}>
+                <View style={[styles.aiStepItem, aiSeparationPercent >= 15 && styles.aiStepItemActive]}>
+                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 15 && styles.aiStepItemTextActive]}>1. Áudio HD</Text>
+                </View>
+                <View style={[styles.aiStepItem, aiSeparationPercent >= 35 && styles.aiStepItemActive]}>
+                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 35 && styles.aiStepItemTextActive]}>2. UVR5 Vocais</Text>
+                </View>
+                <View style={[styles.aiStepItem, aiSeparationPercent >= 70 && styles.aiStepItemActive]}>
+                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 70 && styles.aiStepItemTextActive]}>3. Demucs 6s</Text>
+                </View>
+                <View style={[styles.aiStepItem, aiSeparationPercent >= 90 && styles.aiStepItemActive]}>
+                  <Text style={[styles.aiStepItemText, aiSeparationPercent >= 90 && styles.aiStepItemTextActive]}>4. Mixer HD</Text>
+                </View>
+              </View>
+
+              <Text style={styles.aiDisclaimerText}>
+                💡 O áudio prévio já pode ser reproduzido no mixer abaixo! Assim que a IA terminar (~1 a 2 min), as 6 pistas isoladas carregarão automaticamente.
+              </Text>
             </View>
           )}
 
@@ -2239,5 +2441,289 @@ const styles = StyleSheet.create({
   engineNoticeCode: {
     color: '#cbd5e1',
     fontWeight: '700',
+  },
+  stopServerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#201217',
+    borderWidth: 1,
+    borderColor: '#ef444466',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  stopServerText: {
+    color: '#f87171',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  aiStudioSeparationCard: {
+    backgroundColor: '#081426',
+    borderWidth: 1,
+    borderColor: '#38bdf855',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  aiStudioCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 10,
+  },
+  aiStudioTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  aiPulseIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#0284c725',
+    borderWidth: 1,
+    borderColor: '#38bdf855',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiStudioTitle: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  aiStudioSubtitle: {
+    color: '#38bdf8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  aiStudioHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiEngineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#0f233d',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#0284c744',
+  },
+  aiEngineBadgeText: {
+    color: '#7dd3fc',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cancelSeparationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#261217',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ef444444',
+  },
+  cancelSeparationBtnText: {
+    color: '#f87171',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  aiProgressBarTrack: {
+    height: 8,
+    backgroundColor: '#0f172a',
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    marginBottom: 8,
+  },
+  aiProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#38bdf8',
+    borderRadius: 6,
+  },
+  aiStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  aiStageTitleText: {
+    color: '#f1f5f9',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  aiPercentText: {
+    color: '#38bdf8',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  aiDetailMessageText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  aiStepsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 10,
+  },
+  aiStepItem: {
+    flex: 1,
+    paddingVertical: 5,
+    borderRadius: 5,
+    backgroundColor: '#0b1626',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    alignItems: 'center',
+  },
+  aiStepItemActive: {
+    backgroundColor: '#0369a133',
+    borderColor: '#38bdf8',
+  },
+  aiStepItemText: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  aiStepItemTextActive: {
+    color: '#38bdf8',
+    fontWeight: '800',
+  },
+  aiDisclaimerText: {
+    color: '#64748b',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  shutdownModalCard: {
+    width: 380,
+    maxWidth: '92%',
+    backgroundColor: '#0f172a',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  shutdownIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#450a0a',
+    borderWidth: 1,
+    borderColor: '#ef444455',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  shutdownModalTitle: {
+    color: '#f8fafc',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  shutdownModalBody: {
+    color: '#94a3b8',
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  shutdownModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  cancelShutdownBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelShutdownBtnText: {
+    color: '#cbd5e1',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  confirmShutdownBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#dc2626',
+  },
+  confirmShutdownBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  shutdownFullscreenOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#060a12f6',
+    zIndex: 99999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  shutdownDoneCard: {
+    width: 420,
+    maxWidth: '92%',
+    backgroundColor: '#0b1322',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 16,
+    padding: 28,
+    alignItems: 'center',
+  },
+  shutdownDoneIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#052e16',
+    borderWidth: 1,
+    borderColor: '#22c55e55',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  shutdownDoneTitle: {
+    color: '#f8fafc',
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  shutdownDoneBody: {
+    color: '#94a3b8',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  shutdownDoneSubtext: {
+    color: '#64748b',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
