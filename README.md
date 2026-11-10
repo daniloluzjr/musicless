@@ -10,11 +10,11 @@
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License MIT" />
   <img src="https://img.shields.io/badge/Platform-Web%20%7C%20iOS%20%7C%20Android-informational" alt="Platforms" />
   <img src="https://img.shields.io/badge/Framework-Expo%20%2F%20React%20Native-blueviolet" alt="Expo React Native" />
-  <img src="https://img.shields.io/badge/AI%20Model-Meta%20Demucs%20v4%20(6%20Stems)-success" alt="Demucs v4 6-Stems" />
+  <img src="https://img.shields.io/badge/AI%20Model-UVR5%20MDX--Net%20%2B%20Meta%20Demucs%20v4-success" alt="UVR5 MDX-Net & Demucs v4" />
 </p>
 
 > **The 100% Free & Open-Source Alternative to Moises.ai.**  
-> Separate any track into **6 isolated studio stems** (Vocals, Drums, Bass, Piano, Brass/Sax, and Guitar) via direct file upload or YouTube/Spotify link with **zero bleed**!  
+> Separate any track into **6 isolated studio stems** (Vocals, Drums, Bass, Piano, Brass/Sax, and Guitar) powered by **Ultimate Vocal Remover (UVR5) MDX-Net** and **Meta Demucs v4** with **zero bleed**!  
 > 
 > 🌐 **Live Web App:** [https://musicless-app.vercel.app](https://musicless-app.vercel.app)
 
@@ -81,8 +81,8 @@ MusicLess/
 │   └── package.json
 │
 ├── backend/              # AI Separation Engine (Python / FastAPI)
-│   ├── server.py         # Demucs v4 (htdemucs_6s) + yt-dlp + ffmpeg conversion
-│   ├── requirements.txt  # PyTorch, Demucs, FastAPI, yt-dlp, imageio-ffmpeg
+│   ├── server.py         # UVR5 MDX-Net + Demucs v4 Cascade Demixing + yt-dlp
+│   ├── requirements.txt  # audio-separator, PyTorch, Demucs, FastAPI, yt-dlp
 │   └── Dockerfile        # Container for local or cloud deployment (Hugging Face / Render)
 │
 ├── .vercelignore         # Prevents heavy AI backend from exceeding Vercel limits
