@@ -1,3 +1,14 @@
+---
+title: MusicLess AI
+emoji: 🎵
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
+
 # 🎵 MusicLess — Free & Open-Source AI Stem Separation & Practice Mixer
 
 <p align="center">
