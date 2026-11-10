@@ -23,7 +23,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export -p web"
+    "build": "expo export -p web && node -e \"const fs = require('fs'); if (fs.existsSync('public/MusicLess-Windows-v1.0.0.zip')) { fs.copyFileSync('public/MusicLess-Windows-v1.0.0.zip', 'dist/MusicLess-Windows-v1.0.0.zip'); }\""
   },
   "private": true
 }

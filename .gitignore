@@ -49,3 +49,4 @@ Thumbs.db
 build_pkg/
 MusicLess-Windows-*.zip
 *.zip
+!app/public/*.zip

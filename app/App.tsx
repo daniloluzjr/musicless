@@ -149,6 +149,19 @@ export default function App() {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [donationAmount, setDonationAmount] = useState('5');
 
+  const handleDownloadDirectZip = () => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const link = document.createElement('a');
+      link.href = '/MusicLess-Windows-v1.0.0.zip';
+      link.download = 'MusicLess-Windows-v1.0.0.zip';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } else {
+      Linking.openURL('https://musicless-app.vercel.app/MusicLess-Windows-v1.0.0.zip');
+    }
+  };
+
   const handleOpenPayPal = () => {
     const cleanAmount = donationAmount.trim().replace(/[^0-9.]/g, '');
     const num = parseFloat(cleanAmount);
@@ -601,10 +614,10 @@ export default function App() {
         <View style={styles.headerRightActions}>
           <TouchableOpacity
             style={styles.downloadDesktopBtn}
-            onPress={() => Linking.openURL('https://github.com/daniloluzjr/musicless/releases')}
+            onPress={handleDownloadDirectZip}
           >
             <Download size={14} color="#38bdf8" />
-            <Text style={styles.downloadDesktopText}>Download Desktop</Text>
+            <Text style={styles.downloadDesktopText}>Download Desktop (.zip)</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -887,11 +900,10 @@ export default function App() {
                 <View style={styles.engineNoticeActions}>
                   <TouchableOpacity
                     style={styles.downloadAppChip}
-                    onPress={() => Linking.openURL('https://github.com/daniloluzjr/musicless/releases')}
+                    onPress={handleDownloadDirectZip}
                   >
                     <Download size={13} color="#0f172a" />
-                    <Text style={styles.downloadAppChipText}>Download Free Desktop App (Windows)</Text>
-                    <ExternalLink size={11} color="#0f172a" style={{ marginLeft: 4 }} />
+                    <Text style={styles.downloadAppChipText}>Download Desktop App (.zip)</Text>
                   </TouchableOpacity>
                   <Text style={styles.engineNoticeOrText}>
                     or run <Text style={styles.engineNoticeCode}>py server.py</Text> locally to power this web studio.
